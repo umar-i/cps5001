@@ -1,0 +1,321 @@
+Introduction:
+
+You have been commissioned to design and develop a Predictive Emergency 
+Response Dispatch System (PERDS) for the National Emergency Coordination Agency 
+(NECA). The system must allocate and manage emergency response units efficiently 
+across a network of locations, ensuring that incidents receive rapid attention based 
+on severity, proximity, and resource availability.
+Your solution should be capable of real-time decision-making, dynamic updates to 
+incident and unit data, and predictive analysis of potential high-demand regions. 
+You must determine and justify the appropriate data structures and algorithms 
+required to achieve these objectives. The implementation must be completed in 
+Java, accompanied by a detailed report explaining and evaluating your design 
+decisions
+
+Requirements
+You are required to design and implement a Java-based system that simulates a 
+national emergency response network. The solution must incorporate suitable data 
+structures and algorithms to achieve optimal performance, adaptability, and 
+scalability.
+Your work will be assessed in accordance with the criteria specified in this brief (see 
+the Assessment Criteria section).
+The following provides a guideline of the tasks to be completed to achieve each 
+grade band:
+1) Emergency Network Representation
+You must model the emergency network as an interconnected structure representing 
+cities, dispatch centres, and incidents. Each connection should include weighted 
+factors such as distance, travel time, and resource availability.
+Your system should support dynamic updates, including:
+• Adding or removing nodes (dispatch centres or incident sites);
+• Updating edge weights to reflect real-time changes (e.g., road closures or
+traffic congestion).
+You are expected to select and justify an appropriate data structure for this 
+representation, explaining its efficiency and scalability.
+2) Response Unit Allocation and Route Optimisation
+Implement an algorithmic process for dispatching the nearest and most appropriate 
+response unit to each reported incident.
+Your design should:
+• Identify optimal routes for each dispatch using suitable pathfinding 
+algorithms.
+• Incorporate dynamic reassignment of units when incidents are completed or 
+priorities change.
+• Ensure that allocation decisions are based on multiple criteria, such as 
+severity, distance, and resource type.
+
+You must justify your chosen algorithms and discuss their complexity and suitability 
+for real-time scenarios.
+3) Predictive Analysis and Resource Pre-Positioning
+The system should include functionality to forecast high-demand areas based on 
+historical or simulated data and pre-position response units accordingly.
+You must implement and justify the chosen approach, explaining how predictive 
+insights influence system efficiency.
+4) System Adaptability and Dynamic Updates
+The system must demonstrate adaptability to real-time updates:
+• New incidents appearing dynamically;
+• Units becoming unavailable or reallocated;
+• Routes changing due to environmental conditions.
+Your design should ensure efficient handling of these updates without full system 
+re-computation.
+5) Design Documentation and Analysis
+You must provide a report detailing:
+• The data structures and algorithms selected with a discussion of their 
+implementation;
+• Theoretical complexity analysis (using Big-O notation) for all major 
+operations;
+• Design diagrams showing relationships between system components;
+• Evaluation of performance based on empirical testing;
+• Ethical considerations, such as fairness in resource allocation and reliability 
+in critical decision-making.
+
+Tasks
+You are required to develop a software system, using object-oriented programming 
+and Java, that fulfils the requirements outlined above. Your work will be assessed 
+in accordance with the criteria specified in this brief (see the Assessment Criteria
+section).
+The following provides a guideline of the tasks to be completed to achieve each 
+grade band:
+Third Class (40 – 49): Basic
+Software Artefact Criteria
+• Implements a basic city network representation and can register simple 
+incidents.
+• Uses appropriate data structures (e.g., basic graph).
+• Implements a simple allocation algorithm (e.g., nearest-available unit).
+• Use object-oriented design.
+• Version control used, with commit history.
+Report Criteria
+• Summarises key implementation features with simple diagrams and basic 
+justification of choices.
+Lower Second Class (2:2) (50 – 59): Reasonable
+Software Artefact Criteria
+• Includes a dynamic graph-based city model, concurrent incident 
+management, and basic reallocation.
+• Partial implementation of predictive or optimisation elements.
+Report Criteria
+• Provides clear explanation and limited complexity analysis.
+• Demonstrates reasonable use of version control and incremental
+development
+
+Upper Second Class (2:1) (60 – 69): Comprehensive
+Software Artefact Criteria
+• Fully functional dispatch system with real-time updates and efficient 
+allocation algorithm.
+• Incorporates initial predictive logic and resource management.
+Report Criteria
+• Includes detailed explanations, class diagrams, and complexity analysis.
+• Strong justification of algorithm and data structure choices.
+• Evidence of structured version control practices.
+Frist Class (1st) (70 – 79): Advanced
+Software Artefact Criteria
+• Implements predictive modelling with proactive resource placement.
+• Adapts dynamically to environmental changes (e.g., congestion, incident
+spikes).
+• Demonstrates well-designed architecture with efficient structures (e.g., 
+heaps, hash maps, priority queues).
+Report Criteria
+• Comprehensive analysis of design, complexity, and ethical implications.
+• Critical comparison of alternative approaches.
+• Evidence of professional development practices (branching, merging, 
+documented commits).
+First Class (80–100): Exceptional
+Software Artefact Criteria
+• Implements dynamic predictive algorithms that learn or adapt from historical 
+incident data.
+
+• Demonstrates emergent adaptive behaviour and highly efficient dispatch 
+optimisation under simulated real-time load.
+• Includes statistical evaluation and visualisation of results.
+Report Criteria
+• Presents empirical evidence of performance (graphs, tables, metrics).
+• Critically evaluates algorithmic trade-offs, ethical dimensions, and real-world 
+applicability.
+• Reflects on innovation, scalability, and sustainability of predictive dispatch 
+systems
+
+
+• Java SE 21+: as the programming language and standard library.
+
+Additionally, the following Java libraries and packages may be imported and utilised:
+• Any standard Java data structures and utilities provided by the Java SE 
+library.
+• Appropriate Java libraries for the visualising your system
+• JUnit for testing
+
+
+Prohibited Approaches
+• External algorithmic frameworks (e.g., Guava Graph libraries)
+• AI/ML libraries (e.g., TensorFlow, WEKA)
+
+No additional external libraries or frameworks should be used without the written 
+permission of the module convenor. This restriction ensures that the focus remains 
+on your understanding and application of core Java concepts, data structures, and 
+algorithms.
+
+
+Encouragement
+This assessment is not just about building a working system, but about showing how 
+you think, create, and reflect as a developer. You are encouraged to experiment 
+with different approaches, take creative risks, and explain your design decisions 
+clearly in your report. Marks will reward originality, thoughtful evaluation, and 
+problem-solving, even where your final simulation may not achieve perfect 
+outcomes.
+
+Deliverables are accumulative, starting from third class to eventually First class, proceed only when current class Deliverables are genuinelly 100% complete and reviewed and working.  
+
+1st Class Deliverables
+
+Fully functional system 
+addressing all requirements. 
+Highly efficient, dynamic 
+predictive system using 
+optimised structures and 
+adaptive algorithms. 
+Demonstrates excellent use 
+of efficient algorithms and 
+advanced data structures.
+
+Exceptional depth, evaluation 
+and ethical reflection with strong 
+empirical evidence. Strong 
+evidence to support and justify 
+approaches and clearly 
+articulates an optimised 
+solution.
+
+Extensive version control 
+showing industry-standard 
+practices such as feature 
+branching, pull requests, and 
+commit tagging. Evidence of 
+professional project 
+management and adherence to 
+best practices in software 
+development
+
+Lower First Class Deliverables:
+
+Fully functional system 
+addressing all requirements. 
+Comprehensive, wellstructured dispatch system 
+with predictive and 
+optimisation features. Strong 
+use of object-oriented 
+principles and scalable 
+design.
+
+Detailed report with complexity 
+analysis, supported by clear 
+diagrams and well-explained 
+design choices. Includes a 
+discussion of professional and 
+ethical considerations.
+
+Strong version control 
+evidence, including feature 
+branches and detailed commit 
+messages. Demonstrates 
+effective task management and 
+adherence to professional 
+development standards.
+
+
+Upper Second Class Deliverables:
+
+Mostly functional system 
+addressing core 
+requirements. Functional 
+predictive system using 
+appropriate algorithms and 
+OOP design.
+Detailed documentation 
+explaining the implementation 
+with justifications for data 
+structure and algorithm choices. 
+Includes diagrams and some 
+complexity analysis.
+Good version control practices, 
+with clear commit messages 
+and use of branches. Evidence 
+of iterative development and 
+problem-solving through 
+version history.
+
+Lower Second Class Deleliverables:
+
+Functional system meeting 
+core requirements like basic 
+network representation and 
+partial optimisation. 
+Demonstrates basic object oriented programming 
+principles.
+
+Reasonable documentation 
+explaining implementation 
+choices with limited analysis of 
+complexity or performance. 
+Some supporting diagrams or 
+outputs included.
+
+Basic version control evidence, 
+showing development 
+progression with meaningful 
+commit messages. Limited use 
+of advanced practices like 
+branching or pull requests.
+
+
+Third Class Deliverables:
+
+Partially functional system 
+with basic features. Lacks 
+optimisation functionality.
+ 
+Demonstrates minimal 
+application of object oriented programming.
+Basic documentation 
+summarising implementation 
+with limited justifications and no 
+complexity analysis. Diagrams, if 
+included, lack detail or 
+relevance.
+
+Minimal version control 
+evidence, such as commit 
+history showing basic 
+development stages. Does not 
+demonstrate consistent or 
+professional use of version 
+control practices
+
+
+
+
+
+
+Identify and analyse different algorithmic problems and select and implement 
+appropriate solutions using a variety of data structures and algorithms
+
+You must identify and analyse algorithmic challenges, such as route optimisation, dynamic scheduling, and resource allocation. 
+You are tasked with selecting suitable data structures (e.g., graphs, priority 
+queues) and algorithms (e.g., Dijkstra’s, A*). demonstrate ability to match algorithmic techniques to specific problem requirements.
+
+
+Design and implement algorithms from scratch, using a variety of data 
+structures and search algorithms, and evaluate their performance using 
+appropriate metrics.
+
+Implement algorithms such as graph traversal, shortest path 
+finding, or task scheduling from scratch, applying data structures like adjacency 
+lists, heaps, or hash tables. You must evaluate algorithm performance using metrics 
+such as time and space complexity. The report msut provides a platform to critically 
+discuss your design choices, supported by complexity analysis and rationale for 
+algorithm selection.
+
+The documentation criteria 
+assess your ability to explain and justify your solutions clearly, using diagrams, 
+analysis, and technical explanations for a specialist audience. Additionally, ethical 
+considerations and real-world applications must be discussed in the report, showcasing 
+your ability to communicate to a broader, non-technical audience effectively.
+
+
+
+

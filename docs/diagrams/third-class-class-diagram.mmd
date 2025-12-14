@@ -1,0 +1,80 @@
+classDiagram
+    direction LR
+
+    class GraphReadView {
+        <<interface>>
+        +getNode(NodeId) Optional~Node~
+        +nodeIds() Collection~NodeId~
+        +outgoingEdges(NodeId) Collection~Edge~
+        +getEdge(NodeId, NodeId) Optional~Edge~
+        +version() long
+    }
+
+    class GraphWriteOps {
+        <<interface>>
+        +addNode(Node) long
+        +removeNode(NodeId) long
+        +putEdge(Edge) long
+        +removeEdge(NodeId, NodeId) long
+        +updateEdge(NodeId, NodeId, EdgeWeights, EdgeStatus) long
+    }
+
+    class Graph {
+        <<interface>>
+    }
+
+    GraphReadView <|-- Graph
+    GraphWriteOps <|-- Graph
+
+    class AdjacencyMapGraph
+    Graph <|.. AdjacencyMapGraph
+
+    class Router {
+        <<interface>>
+        +findRoute(GraphReadView, NodeId, NodeId, EdgeCostFunction) Optional~Route~
+    }
+
+    class DijkstraRouter
+    Router <|.. DijkstraRouter
+
+    class IndexedMinPriorityQueue {
+        <<interface>>
+        +insert(int, double)
+        +extractMin() int
+        +decreaseKey(int, double)
+    }
+    class BinaryHeapIndexedMinPriorityQueue
+    IndexedMinPriorityQueue <|.. BinaryHeapIndexedMinPriorityQueue
+    DijkstraRouter --> IndexedMinPriorityQueue : uses
+
+    class DispatchEngine {
+        <<interface>>
+        +compute(SystemSnapshot) List~DispatchCommand~
+    }
+    class DefaultDispatchEngine
+    DispatchEngine <|.. DefaultDispatchEngine
+
+    class DispatchPolicy {
+        <<interface>>
+        +choose(SystemSnapshot, Incident) Optional~DispatchDecision~
+    }
+    class NearestAvailableUnitPolicy
+    DispatchPolicy <|.. NearestAvailableUnitPolicy
+    NearestAvailableUnitPolicy --> Router : routes
+
+    class PerdsController
+    PerdsController --> Graph : owns
+    PerdsController --> DispatchEngine : computes
+
+    class SystemCommand
+    class SystemSnapshot
+    PerdsController --> SystemCommand : executes
+    PerdsController --> SystemSnapshot : produces
+
+    class DispatchCommand
+    class DispatchDecision
+    class Assignment
+    DispatchDecision --> Assignment
+    DefaultDispatchEngine --> DispatchPolicy
+    DefaultDispatchEngine --> DispatchCommand : emits
+

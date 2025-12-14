@@ -1,0 +1,229 @@
+package com.neca.perds.app;
+
+import com.neca.perds.dispatch.DispatchCommand;
+import com.neca.perds.dispatch.DispatchEngine;
+import com.neca.perds.graph.Graph;
+import com.neca.perds.metrics.MetricsCollector;
+import com.neca.perds.model.Assignment;
+import com.neca.perds.model.DispatchCentre;
+import com.neca.perds.model.DispatchCentreId;
+import com.neca.perds.model.Incident;
+import com.neca.perds.model.IncidentId;
+import com.neca.perds.model.IncidentStatus;
+import com.neca.perds.model.NodeId;
+import com.neca.perds.model.ResponseUnit;
+import com.neca.perds.model.UnitId;
+import com.neca.perds.model.UnitStatus;
+import com.neca.perds.prediction.DemandPredictor;
+import com.neca.perds.prediction.PrepositioningStrategy;
+import com.neca.perds.sim.SystemCommand;
+import com.neca.perds.sim.SystemCommandExecutor;
+import com.neca.perds.system.SystemSnapshot;
+
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+public final class PerdsController implements SystemCommandExecutor {
+    private final Graph graph;
+    private final DispatchEngine dispatchEngine;
+    private final DemandPredictor demandPredictor;
+    private final PrepositioningStrategy prepositioningStrategy;
+    private final MetricsCollector metricsCollector;
+
+    private final Map<UnitId, ResponseUnit> units = new HashMap<>();
+    private final Map<DispatchCentreId, DispatchCentre> dispatchCentres = new HashMap<>();
+    private final Map<IncidentId, Incident> incidents = new HashMap<>();
+    private final Map<IncidentId, Assignment> assignments = new HashMap<>();
+
+    public PerdsController(
+            Graph graph,
+            DispatchEngine dispatchEngine,
+            DemandPredictor demandPredictor,
+            PrepositioningStrategy prepositioningStrategy,
+            MetricsCollector metricsCollector
+    ) {
+        this.graph = Objects.requireNonNull(graph, "graph");
+        this.dispatchEngine = Objects.requireNonNull(dispatchEngine, "dispatchEngine");
+        this.demandPredictor = Objects.requireNonNull(demandPredictor, "demandPredictor");
+        this.prepositioningStrategy = Objects.requireNonNull(prepositioningStrategy, "prepositioningStrategy");
+        this.metricsCollector = Objects.requireNonNull(metricsCollector, "metricsCollector");
+    }
+
+    public Graph graph() {
+        return graph;
+    }
+
+    public SystemSnapshot snapshot(Instant now) {
+        return new SystemSnapshot(
+                graph,
+                now,
+                List.copyOf(units.values()),
+                List.copyOf(dispatchCentres.values()),
+                List.copyOf(incidents.values()),
+                List.copyOf(assignments.values())
+        );
+    }
+
+    @Override
+    public void execute(SystemCommand command, Instant at) {
+        Objects.requireNonNull(command, "command");
+        Objects.requireNonNull(at, "at");
+
+        switch (command) {
+            case SystemCommand.ReportIncidentCommand c -> {
+                incidents.put(c.incident().id(), c.incident());
+                demandPredictor.observe(c.incident());
+            }
+            case SystemCommand.ResolveIncidentCommand c -> {
+                resolveIncident(c.incidentId(), at);
+            }
+            case SystemCommand.AddNodeCommand c -> graph.addNode(c.node());
+            case SystemCommand.RemoveNodeCommand c -> graph.removeNode(c.nodeId());
+            case SystemCommand.PutEdgeCommand c -> graph.putEdge(c.edge());
+            case SystemCommand.RemoveEdgeCommand c -> graph.removeEdge(c.from(), c.to());
+            case SystemCommand.UpdateEdgeCommand c -> graph.updateEdge(c.from(), c.to(), c.weights(), c.status());
+            case SystemCommand.RegisterUnitCommand c -> units.put(c.unit().id(), c.unit());
+            case SystemCommand.SetUnitStatusCommand c -> setUnitStatus(c.unitId(), c.status());
+            case SystemCommand.MoveUnitCommand c -> moveUnit(c.unitId(), c.newNodeId());
+        }
+
+        List<DispatchCommand> computed = dispatchEngine.compute(snapshot(at));
+        for (DispatchCommand dispatchCommand : computed) {
+            applyDispatchCommand(dispatchCommand, at);
+            metricsCollector.recordDispatchCommandApplied(at, dispatchCommand);
+        }
+    }
+
+    private void applyDispatchCommand(DispatchCommand command, Instant at) {
+        switch (command) {
+            case DispatchCommand.AssignUnitCommand c -> applyAssignment(c, at);
+            case DispatchCommand.RerouteUnitCommand ignored -> {}
+            case DispatchCommand.CancelAssignmentCommand ignored -> {}
+        }
+    }
+
+    private void applyAssignment(DispatchCommand.AssignUnitCommand command, Instant at) {
+        if (assignments.containsKey(command.incidentId())) {
+            return;
+        }
+
+        Incident incident = incidents.get(command.incidentId());
+        if (incident == null) {
+            throw new IllegalStateException("Unknown incident: " + command.incidentId());
+        }
+        if (incident.status() != IncidentStatus.REPORTED && incident.status() != IncidentStatus.QUEUED) {
+            return;
+        }
+        ResponseUnit unit = requireUnit(command.unitId());
+        if (!unit.isAvailable()) {
+            return;
+        }
+
+        assignments.put(
+                command.incidentId(),
+                new Assignment(command.incidentId(), command.unitId(), command.route(), at)
+        );
+
+        units.put(
+                unit.id(),
+                new ResponseUnit(
+                        unit.id(),
+                        unit.type(),
+                        UnitStatus.EN_ROUTE,
+                        unit.currentNodeId(),
+                        Optional.of(command.incidentId()),
+                        unit.homeDispatchCentreId()
+                )
+        );
+
+        incidents.put(
+                incident.id(),
+                new Incident(
+                        incident.id(),
+                        incident.locationNodeId(),
+                        incident.severity(),
+                        incident.requiredUnitTypes(),
+                        IncidentStatus.DISPATCHED,
+                        incident.reportedAt(),
+                        incident.resolvedAt()
+                )
+        );
+    }
+
+    private void resolveIncident(IncidentId incidentId, Instant at) {
+        Incident incident = incidents.get(incidentId);
+        if (incident == null) {
+            throw new IllegalStateException("Unknown incident: " + incidentId);
+        }
+
+        incidents.put(
+                incident.id(),
+                new Incident(
+                        incident.id(),
+                        incident.locationNodeId(),
+                        incident.severity(),
+                        incident.requiredUnitTypes(),
+                        IncidentStatus.RESOLVED,
+                        incident.reportedAt(),
+                        Optional.of(at)
+                )
+        );
+
+        Assignment assignment = assignments.get(incidentId);
+        if (assignment == null) {
+            return;
+        }
+
+        ResponseUnit unit = requireUnit(assignment.unitId());
+        units.put(
+                unit.id(),
+                new ResponseUnit(
+                        unit.id(),
+                        unit.type(),
+                        UnitStatus.AVAILABLE,
+                        unit.currentNodeId(),
+                        Optional.empty(),
+                        unit.homeDispatchCentreId()
+                )
+        );
+    }
+
+    private void setUnitStatus(UnitId unitId, UnitStatus status) {
+        ResponseUnit unit = requireUnit(unitId);
+        units.put(
+                unitId,
+                new ResponseUnit(
+                        unit.id(),
+                        unit.type(),
+                        status,
+                        unit.currentNodeId(),
+                        unit.assignedIncidentId(),
+                        unit.homeDispatchCentreId()
+                )
+        );
+    }
+
+    private void moveUnit(UnitId unitId, NodeId newNodeId) {
+        ResponseUnit unit = requireUnit(unitId);
+        units.put(
+                unitId,
+                new ResponseUnit(
+                        unit.id(),
+                        unit.type(),
+                        unit.status(),
+                        newNodeId,
+                        unit.assignedIncidentId(),
+                        unit.homeDispatchCentreId()
+                )
+        );
+    }
+
+    private ResponseUnit requireUnit(UnitId unitId) {
+        return Optional.ofNullable(units.get(unitId))
+                .orElseThrow(() -> new IllegalStateException("Unknown unit: " + unitId));
+    }
+}

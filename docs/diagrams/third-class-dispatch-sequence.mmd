@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant Controller as PerdsController
+    participant Graph as AdjacencyMapGraph
+    participant Engine as DefaultDispatchEngine
+    participant Policy as NearestAvailableUnitPolicy
+    participant Router as DijkstraRouter
+
+    User->>Controller: execute(ReportIncidentCommand)
+    Controller->>Engine: compute(snapshot)
+    Engine->>Policy: choose(snapshot, incident)
+    Policy->>Router: findRoute(graph, unitNode, incidentNode)
+    Router->>Graph: outgoingEdges(...) / getEdge(...)
+    Router-->>Policy: Route
+    Policy-->>Engine: DispatchDecision(Assignment, Rationale)
+    Engine-->>Controller: AssignUnitCommand(...)
+    Controller->>Controller: applyAssignment(...)
+    Controller-->>User: assignment stored + unit EN_ROUTE
+

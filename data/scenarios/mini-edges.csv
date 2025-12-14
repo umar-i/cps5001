@@ -1,0 +1,8 @@
+from,to,distanceKm,travelTimeSeconds,resourceAvailability,status
+A,B,5,300,1,OPEN
+B,A,5,300,1,OPEN
+B,C,5,300,1,OPEN
+C,B,5,300,1,OPEN
+A,C,20,1200,1,OPEN
+C,A,20,1200,1,OPEN
+

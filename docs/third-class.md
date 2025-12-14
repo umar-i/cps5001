@@ -30,6 +30,9 @@ This document summarises what is implemented for the **Third Class (40–49)** g
 Run tests:
 - `mvn test`
 
+If your environment blocks forked test JVMs:
+- `mvn "-Dperds.surefire.forkCount=0" test`
+
 Run demo:
 - `mvn -q -DskipTests package`
 - `java -jar target/perds-0.1.0-SNAPSHOT.jar demo`
@@ -74,7 +77,6 @@ Let:
 
 ## Known Limitations (Deliberate, for later bands)
 - No caching/targeted re-routing on graph changes.
-- No dynamic reallocation/rerouting logic beyond releasing units on resolution.
-- Prediction/pre-positioning are no-op placeholders.
-- CSV scenario/network loaders are not implemented yet.
-
+- Rerouting is not implemented (2:2 adds basic cancellation/reassignment; see `docs/lower-second.md`).
+- Prediction/pre-positioning are not part of the Third Class baseline (2:2 adds a minimal predictor + preposition command; see `docs/lower-second.md`).
+- CSV scenario/network loading is not part of the Third Class baseline (2:2 adds CSV loaders + CLI scenario runner; see `docs/lower-second.md`).

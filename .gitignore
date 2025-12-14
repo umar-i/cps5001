@@ -16,5 +16,7 @@ Thumbs.db
 *.log
 .cursor/
 
+data/out/
+
 AGENTS.md
 requirements.txt

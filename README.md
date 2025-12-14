@@ -4,15 +4,17 @@ Java SE 21+ coursework project that simulates an emergency-response dispatch net
 
 ## Status
 
-- Current milestone: **Third Class baseline implemented** (`docs/third-class.md`).
-- Next milestone: **2:2 features** (dynamic update handling + early reallocation + CSV scenarios).
+- Current milestone: **2:2 deliverable implemented** (`docs/lower-second.md`).
+- Next milestone: **2:1 features** (stronger multi-criteria dispatch + caching/invalidation + broader evaluation).
 
-## What's Implemented (Baseline)
+## What's Implemented
 
 - Dynamic weighted graph: adjacency-map representation (`com.neca.perds.graph`)
-- Routing: `DijkstraRouter` + custom indexed binary-heap PQ (`com.neca.perds.routing`, `com.neca.perds.ds`)
+- Routing: `DijkstraRouter` + `AStarRouter` + custom indexed binary-heap PQ (`com.neca.perds.routing`, `com.neca.perds.ds`)
 - Dispatch (simple): prioritise by severity/age, allocate nearest available matching unit type (`com.neca.perds.dispatch`)
 - End-to-end cycle: commands -> dispatch decisions -> assignments applied (`com.neca.perds.app`, `com.neca.perds.sim`)
+- CSV loaders + scenario runner + metrics export (`com.neca.perds.io`, `com.neca.perds.metrics`, `com.neca.perds.cli`)
+- Basic reallocation on unit unavailability; simple demand prediction + hotspot pre-position command (`com.neca.perds.app`, `com.neca.perds.prediction`)
 - CLI demo + JUnit 5 tests (`com.neca.perds.cli`, `src/test/java/...`)
 
 ## Quick Start
@@ -22,6 +24,7 @@ Prereqs: Java 21+, Maven 3.9+.
 - Run tests: `mvn test`
 - Package: `mvn -q -DskipTests package`
 - Run demo: `java -jar target/perds-0.1.0-SNAPSHOT.jar demo`
+- Run sample scenario + export metrics: `java -jar target/perds-0.1.0-SNAPSHOT.jar scenario data/scenarios/mini-nodes.csv data/scenarios/mini-edges.csv data/scenarios/mini-events.csv data/out`
 
 If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0" test`
 
@@ -34,7 +37,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
   - `ds/` custom data structures used by algorithms (e.g., indexed heap)
   - `sim/` command model and simulation primitives
   - `metrics/` metrics capture/export interfaces (baseline in-memory collector)
-  - `io/` CSV loaders/exporters (some stubs; see Roadmap)
+  - `io/` CSV loaders for networks and scenarios
   - `cli/` CLI entry point (`Main`)
 - `src/test/java/...` - JUnit 5 tests
 - `docs/` - report material, design notes, and diagrams
@@ -43,6 +46,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 ## Documentation
 
 - Baseline deliverable: `docs/third-class.md`
+- 2:2 deliverable: `docs/lower-second.md`
 - Target architecture / APIs: `docs/architecture.md`
 - Evaluation plan: `docs/evaluation.md`
 - Ethics reflection notes: `docs/ethics.md`
@@ -51,7 +55,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 ## Roadmap (Grade Bands)
 
 - [x] Third Class (40-49): dynamic graph + Dijkstra routing + simple dispatch + CLI demo + tests
-- [ ] 2:2 (50-59): CSV scenario/network loading; handle dynamic updates without full recomputation; basic reallocation/reroute commands; initial metrics exports
+- [x] 2:2 (50-59): CSV scenario/network loading; basic reallocation; initial metrics exports; partial prediction + one pre-position action
 - [ ] 2:1 (60-69): stronger multi-criteria dispatch scoring; caching/invalidation strategy; broader simulation scenarios + empirical evaluation write-up
 - [ ] First (70+): predictive demand + systematic pre-positioning; larger-scale experiments; visualisation (CSV/diagrams) and report polish
 

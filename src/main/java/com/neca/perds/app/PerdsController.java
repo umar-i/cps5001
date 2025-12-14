@@ -16,10 +16,12 @@ import com.neca.perds.model.UnitId;
 import com.neca.perds.model.UnitStatus;
 import com.neca.perds.prediction.DemandPredictor;
 import com.neca.perds.prediction.PrepositioningStrategy;
+import com.neca.perds.prediction.RepositionPlan;
 import com.neca.perds.sim.SystemCommand;
 import com.neca.perds.sim.SystemCommandExecutor;
 import com.neca.perds.system.SystemSnapshot;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -89,9 +91,15 @@ public final class PerdsController implements SystemCommandExecutor {
             case SystemCommand.RegisterUnitCommand c -> units.put(c.unit().id(), c.unit());
             case SystemCommand.SetUnitStatusCommand c -> setUnitStatus(c.unitId(), c.status());
             case SystemCommand.MoveUnitCommand c -> moveUnit(c.unitId(), c.newNodeId());
+            case SystemCommand.PrepositionUnitsCommand c -> prepositionUnits(c.horizon(), at);
         }
 
-        List<DispatchCommand> computed = dispatchEngine.compute(snapshot(at));
+        SystemSnapshot snapshot = snapshot(at);
+        long startedNanos = System.nanoTime();
+        List<DispatchCommand> computed = dispatchEngine.compute(snapshot);
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - startedNanos);
+        metricsCollector.recordDispatchComputation(at, elapsed, snapshot.incidents().size(), snapshot.units().size());
+
         for (DispatchCommand dispatchCommand : computed) {
             applyDispatchCommand(dispatchCommand, at);
             metricsCollector.recordDispatchCommandApplied(at, dispatchCommand);
@@ -102,7 +110,7 @@ public final class PerdsController implements SystemCommandExecutor {
         switch (command) {
             case DispatchCommand.AssignUnitCommand c -> applyAssignment(c, at);
             case DispatchCommand.RerouteUnitCommand ignored -> {}
-            case DispatchCommand.CancelAssignmentCommand ignored -> {}
+            case DispatchCommand.CancelAssignmentCommand c -> cancelAssignment(c.incidentId());
         }
     }
 
@@ -194,6 +202,13 @@ public final class PerdsController implements SystemCommandExecutor {
 
     private void setUnitStatus(UnitId unitId, UnitStatus status) {
         ResponseUnit unit = requireUnit(unitId);
+
+        Optional<IncidentId> assignedIncidentId = unit.assignedIncidentId();
+        if (assignedIncidentId.isPresent() && !isAssignmentCompatibleStatus(status)) {
+            cancelAssignment(assignedIncidentId.get());
+            unit = requireUnit(unitId);
+        }
+
         units.put(
                 unitId,
                 new ResponseUnit(
@@ -225,5 +240,83 @@ public final class PerdsController implements SystemCommandExecutor {
     private ResponseUnit requireUnit(UnitId unitId) {
         return Optional.ofNullable(units.get(unitId))
                 .orElseThrow(() -> new IllegalStateException("Unknown unit: " + unitId));
+    }
+
+    private static boolean isAssignmentCompatibleStatus(UnitStatus status) {
+        return status == UnitStatus.EN_ROUTE || status == UnitStatus.ON_SCENE;
+    }
+
+    private void cancelAssignment(IncidentId incidentId) {
+        assignments.remove(incidentId);
+        Incident incident = incidents.get(incidentId);
+        if (incident != null && incident.status() != IncidentStatus.RESOLVED) {
+            incidents.put(
+                    incident.id(),
+                    new Incident(
+                            incident.id(),
+                            incident.locationNodeId(),
+                            incident.severity(),
+                            incident.requiredUnitTypes(),
+                            IncidentStatus.QUEUED,
+                            incident.reportedAt(),
+                            incident.resolvedAt()
+                    )
+            );
+        }
+
+        var unitIdsToClear = units.values().stream()
+                .filter(u -> u.assignedIncidentId().isPresent() && u.assignedIncidentId().get().equals(incidentId))
+                .map(ResponseUnit::id)
+                .toList();
+        for (UnitId unitId : unitIdsToClear) {
+            ResponseUnit unit = units.get(unitId);
+            if (unit == null) {
+                continue;
+            }
+            if (unit.assignedIncidentId().isEmpty() || !unit.assignedIncidentId().get().equals(incidentId)) {
+                continue;
+            }
+
+                units.put(
+                        unit.id(),
+                        new ResponseUnit(
+                                unit.id(),
+                                unit.type(),
+                                unit.status(),
+                                unit.currentNodeId(),
+                                Optional.empty(),
+                                unit.homeDispatchCentreId()
+                        )
+                );
+        }
+    }
+
+    private void prepositionUnits(Duration horizon, Instant at) {
+        var forecast = demandPredictor.forecast(at, horizon);
+        RepositionPlan plan = prepositioningStrategy.plan(snapshot(at), forecast);
+        for (var move : plan.moves()) {
+            ResponseUnit unit = units.get(move.unitId());
+            if (unit == null || !unit.isAvailable()) {
+                continue;
+            }
+            if (unit.currentNodeId().equals(move.targetNodeId())) {
+                continue;
+            }
+            if (graph.getNode(move.targetNodeId()).isEmpty()) {
+                continue;
+            }
+
+            units.put(
+                    unit.id(),
+                    new ResponseUnit(
+                            unit.id(),
+                            unit.type(),
+                            unit.status(),
+                            move.targetNodeId(),
+                            Optional.empty(),
+                            unit.homeDispatchCentreId()
+                    )
+            );
+        }
     }
 }

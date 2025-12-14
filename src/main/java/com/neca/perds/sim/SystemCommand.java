@@ -11,6 +11,7 @@ import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
 import com.neca.perds.model.UnitStatus;
 
+import java.time.Duration;
 import java.util.Objects;
 
 public sealed interface SystemCommand permits
@@ -23,7 +24,8 @@ public sealed interface SystemCommand permits
         SystemCommand.UpdateEdgeCommand,
         SystemCommand.RegisterUnitCommand,
         SystemCommand.SetUnitStatusCommand,
-        SystemCommand.MoveUnitCommand {
+        SystemCommand.MoveUnitCommand,
+        SystemCommand.PrepositionUnitsCommand {
 
     record ReportIncidentCommand(Incident incident) implements SystemCommand {
         public ReportIncidentCommand {
@@ -90,5 +92,13 @@ public sealed interface SystemCommand permits
             Objects.requireNonNull(newNodeId, "newNodeId");
         }
     }
-}
 
+    record PrepositionUnitsCommand(Duration horizon) implements SystemCommand {
+        public PrepositionUnitsCommand {
+            Objects.requireNonNull(horizon, "horizon");
+            if (horizon.isNegative() || horizon.isZero()) {
+                throw new IllegalArgumentException("horizon must be > 0");
+            }
+        }
+    }
+}

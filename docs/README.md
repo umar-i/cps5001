@@ -6,6 +6,10 @@ Suggested structure:
 - `docs/architecture.md` - system architecture and interfaces.
 - `docs/third-class.md` - Third Class summary (implemented baseline).
 - `docs/lower-second.md` - 2:2 summary (implemented).
+- `docs/roadmap.md` - milestone checklist (grade bands).
 - `docs/diagrams/` - class diagrams and sequence diagrams (text formats preferred).
 - `docs/evaluation.md` - empirical testing plan and results.
 - `docs/ethics.md` - ethical considerations and reflection.
+
+Other top-level folders:
+- `.github/` - GitHub templates and CI workflows (PR template, issue templates, Actions).

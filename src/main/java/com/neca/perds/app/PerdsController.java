@@ -4,7 +4,6 @@ import com.neca.perds.dispatch.DispatchCommand;
 import com.neca.perds.dispatch.DispatchDecision;
 import com.neca.perds.dispatch.DispatchEngine;
 import com.neca.perds.graph.Graph;
-import com.neca.perds.graph.EdgeStatus;
 import com.neca.perds.metrics.MetricsCollector;
 import com.neca.perds.model.Assignment;
 import com.neca.perds.model.DispatchCentre;
@@ -19,6 +18,11 @@ import com.neca.perds.model.UnitStatus;
 import com.neca.perds.prediction.DemandPredictor;
 import com.neca.perds.prediction.PrepositioningStrategy;
 import com.neca.perds.prediction.RepositionPlan;
+import com.neca.perds.routing.CostFunctions;
+import com.neca.perds.routing.DijkstraRouter;
+import com.neca.perds.routing.EdgeCostFunction;
+import com.neca.perds.routing.Route;
+import com.neca.perds.routing.Router;
 import com.neca.perds.sim.SystemCommand;
 import com.neca.perds.sim.SystemCommandExecutor;
 import com.neca.perds.system.SystemSnapshot;
@@ -32,6 +36,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class PerdsController implements SystemCommandExecutor {
+    private static final Router REROUTE_ROUTER = new DijkstraRouter();
+    private static final EdgeCostFunction REROUTE_COST_FUNCTION = CostFunctions.travelTimeSeconds();
+
     private final Graph graph;
     private final DispatchEngine dispatchEngine;
     private final DemandPredictor demandPredictor;
@@ -80,6 +87,7 @@ public final class PerdsController implements SystemCommandExecutor {
         NodeId changedEdgeFrom = null;
         NodeId changedEdgeTo = null;
         boolean changedEdgeMayInvalidateRoutes = false;
+        String changedEdgeReason = null;
 
         switch (command) {
             case SystemCommand.ReportIncidentCommand c -> {
@@ -97,14 +105,14 @@ public final class PerdsController implements SystemCommandExecutor {
                 changedEdgeFrom = c.from();
                 changedEdgeTo = c.to();
                 changedEdgeMayInvalidateRoutes = true;
+                changedEdgeReason = "Edge removed (" + c.from() + " -> " + c.to() + ")";
             }
             case SystemCommand.UpdateEdgeCommand c -> {
                 graph.updateEdge(c.from(), c.to(), c.weights(), c.status());
-                if (c.status() == EdgeStatus.CLOSED) {
-                    changedEdgeFrom = c.from();
-                    changedEdgeTo = c.to();
-                    changedEdgeMayInvalidateRoutes = true;
-                }
+                changedEdgeFrom = c.from();
+                changedEdgeTo = c.to();
+                changedEdgeMayInvalidateRoutes = true;
+                changedEdgeReason = "Edge updated (" + c.from() + " -> " + c.to() + ") status=" + c.status();
             }
             case SystemCommand.RegisterUnitCommand c -> units.put(c.unit().id(), c.unit());
             case SystemCommand.SetUnitStatusCommand c -> setUnitStatus(c.unitId(), c.status());
@@ -113,7 +121,7 @@ public final class PerdsController implements SystemCommandExecutor {
         }
 
         if (changedEdgeMayInvalidateRoutes) {
-            cancelAssignmentsUsingEdge(changedEdgeFrom, changedEdgeTo, at);
+            rerouteOrCancelAssignmentsUsingEdge(changedEdgeFrom, changedEdgeTo, changedEdgeReason, at);
         }
 
         SystemSnapshot snapshot = snapshot(at);
@@ -294,7 +302,7 @@ public final class PerdsController implements SystemCommandExecutor {
         return status == UnitStatus.EN_ROUTE || status == UnitStatus.ON_SCENE;
     }
 
-    private void cancelAssignmentsUsingEdge(NodeId from, NodeId to, Instant at) {
+    private void rerouteOrCancelAssignmentsUsingEdge(NodeId from, NodeId to, String reason, Instant at) {
         if (from == null || to == null) {
             return;
         }
@@ -308,12 +316,7 @@ public final class PerdsController implements SystemCommandExecutor {
                 .toList();
 
         for (IncidentId incidentId : affectedIncidentIds) {
-            DispatchCommand cancel = new DispatchCommand.CancelAssignmentCommand(
-                    incidentId,
-                    "Route invalidated: edge became unavailable (" + from + " -> " + to + ")"
-            );
-            applyDispatchCommand(cancel, at);
-            metricsCollector.recordDispatchCommandApplied(at, cancel);
+            rerouteOrCancelAssignment(incidentId, reason, at);
         }
     }
 
@@ -325,6 +328,57 @@ public final class PerdsController implements SystemCommandExecutor {
             }
         }
         return false;
+    }
+
+    private void rerouteOrCancelAssignment(IncidentId incidentId, String reason, Instant at) {
+        Objects.requireNonNull(incidentId, "incidentId");
+        Objects.requireNonNull(at, "at");
+
+        Assignment assignment = assignments.get(incidentId);
+        if (assignment == null) {
+            return;
+        }
+
+        Incident incident = incidents.get(incidentId);
+        if (incident == null || incident.status() == IncidentStatus.RESOLVED) {
+            return;
+        }
+
+        ResponseUnit unit = units.get(assignment.unitId());
+        if (unit == null) {
+            cancelAssignmentWithReason(incidentId, reason, at);
+            return;
+        }
+        if (unit.assignedIncidentId().isEmpty() || !unit.assignedIncidentId().get().equals(incidentId)) {
+            return;
+        }
+
+        Optional<Route> newRoute = REROUTE_ROUTER.findRoute(
+                graph,
+                unit.currentNodeId(),
+                incident.locationNodeId(),
+                REROUTE_COST_FUNCTION
+        );
+
+        if (newRoute.isPresent()) {
+            DispatchCommand reroute = new DispatchCommand.RerouteUnitCommand(
+                    unit.id(),
+                    newRoute.get(),
+                    reason == null ? "Route recalculated due to edge update" : reason
+            );
+            applyDispatchCommand(reroute, at);
+            metricsCollector.recordDispatchCommandApplied(at, reroute);
+            return;
+        }
+
+        cancelAssignmentWithReason(incidentId, reason, at);
+    }
+
+    private void cancelAssignmentWithReason(IncidentId incidentId, String reason, Instant at) {
+        String message = reason == null ? "Route became unreachable after edge update" : reason;
+        DispatchCommand cancel = new DispatchCommand.CancelAssignmentCommand(incidentId, message);
+        applyDispatchCommand(cancel, at);
+        metricsCollector.recordDispatchCommandApplied(at, cancel);
     }
 
     private void cancelAssignment(IncidentId incidentId) {

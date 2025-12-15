@@ -23,8 +23,8 @@ import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
 import com.neca.perds.model.UnitStatus;
 import com.neca.perds.model.UnitType;
-import com.neca.perds.prediction.ExponentialSmoothingDemandPredictor;
 import com.neca.perds.prediction.GreedyHotspotPrepositioningStrategy;
+import com.neca.perds.prediction.SlidingWindowDemandPredictor;
 import com.neca.perds.sim.SimulationEngine;
 import com.neca.perds.sim.SystemCommand;
 
@@ -78,7 +78,7 @@ public final class Main {
         var controller = new PerdsController(
                 graph,
                 dispatchEngine,
-                new ExponentialSmoothingDemandPredictor(),
+                new SlidingWindowDemandPredictor(),
                 new GreedyHotspotPrepositioningStrategy(),
                 new InMemoryMetricsCollector()
         );
@@ -153,7 +153,7 @@ public final class Main {
 
         try {
             var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
-            var demandPredictor = new ExponentialSmoothingDemandPredictor();
+            var demandPredictor = new SlidingWindowDemandPredictor();
             var prepositioning = new GreedyHotspotPrepositioningStrategy();
             var controller = new PerdsController(graph, dispatchEngine, demandPredictor, prepositioning, metrics);
 

@@ -28,4 +28,4 @@ Deliverables are cumulative: **Third → 2:2 → 2:1 → First**. Do not advance
 
 ## First Class (70+)
 
-- [ ] Complete `docs/todo-first.md`
+- [x] Complete `docs/todo-first.md`

@@ -6,9 +6,9 @@ Goal: reach the **Lower First Class** software + report criteria from `requireme
 
 - [x] Adapt to congestion: reroute active assignments when edge weights change (fallback to cancel + reassignment if unreachable)
 - [x] Predictive demand: implement a rate-based (windowed) demand predictor that reacts to incident spikes
-- [ ] Systematic pre-positioning: distribute available units across the top-demand zones (limit moves; respect unit availability)
+- [x] Systematic pre-positioning: distribute available units across the top-demand zones (limit moves; respect unit availability)
 - [ ] Optimisation: keep allocation efficient (continue using multi-source routing; avoid per-unit rerouting where possible)
-- [ ] Add targeted tests for rerouting, prediction, and pre-positioning
+- [x] Add targeted tests for rerouting, prediction, and pre-positioning
 
 ## Evaluation / Visualisation
 

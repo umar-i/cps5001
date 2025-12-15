@@ -1,6 +1,7 @@
 package com.neca.perds.app;
 
 import com.neca.perds.dispatch.DispatchCommand;
+import com.neca.perds.dispatch.DispatchDecision;
 import com.neca.perds.dispatch.DispatchEngine;
 import com.neca.perds.graph.Graph;
 import com.neca.perds.graph.EdgeStatus;
@@ -152,9 +153,10 @@ public final class PerdsController implements SystemCommandExecutor {
             return;
         }
 
+        Assignment assignment = new Assignment(command.incidentId(), command.unitId(), command.route(), at);
         assignments.put(
                 command.incidentId(),
-                new Assignment(command.incidentId(), command.unitId(), command.route(), at)
+                assignment
         );
 
         units.put(
@@ -181,6 +183,8 @@ public final class PerdsController implements SystemCommandExecutor {
                         incident.resolvedAt()
                 )
         );
+
+        metricsCollector.recordDispatchDecision(at, new DispatchDecision(assignment, command.rationale()));
     }
 
     private void applyReroute(DispatchCommand.RerouteUnitCommand command) {

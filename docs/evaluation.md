@@ -1,8 +1,36 @@
-# Evaluation Plan (Placeholder)
+# Evaluation Plan (2:2 → 2:1)
 
-This file will hold the empirical testing methodology and results:
-- scenarios used (size, density, incident rates)
-- metrics collected (dispatch time, response time, utilisation, fairness)
-- comparisons (Dijkstra vs A*, caching on/off, prediction on/off)
-- charts/tables produced from `data/out/`
+This file captures a lightweight, reproducible evaluation method that can be expanded for the final report.
+
+## How To Run
+
+Prereqs: Java 21+, Maven 3.9+.
+
+### Scenario 1: Reallocation + Pre-position (2:2 baseline)
+
+Runs the existing mini scenario (unit becomes unavailable; later a pre-position event).
+
+- `mvn -q -DskipTests package`
+- `java -jar target/perds-0.1.0-SNAPSHOT.jar scenario data/scenarios/mini-nodes.csv data/scenarios/mini-edges.csv data/scenarios/mini-events.csv data/out`
+
+### Scenario 2: Route Invalidation on Edge Closure (2:1 update handling)
+
+Demonstrates real-time route change handling: an edge used by the current assignment is closed, which triggers cancellation + reassignment.
+
+- `mvn -q -DskipTests package`
+- `java -jar target/perds-0.1.0-SNAPSHOT.jar scenario data/scenarios/mini-nodes.csv data/scenarios/mini-edges.csv data/scenarios/edge-closure-events.csv data/out`
+
+## Metrics Exported
+
+The CLI scenario runner writes CSVs to the chosen output directory:
+
+- `dispatch_computations.csv`: dispatch compute time per event step
+- `dispatch_decisions.csv`: (applied) assignment decisions with scores/components
+- `dispatch_commands_applied.csv`: applied dispatch commands, including cancellations
+
+## What To Analyse (Report-Friendly)
+
+- Dispatch computation time vs scenario size/complexity.
+- Number of cancellations/reassignments triggered by unit unavailability and by edge closures.
+- Comparison of decisions/commands across scenarios (e.g., does the system recover quickly after a route change?).
 

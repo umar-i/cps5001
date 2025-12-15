@@ -1,8 +1,10 @@
 package com.neca.perds.app;
 
 import com.neca.perds.dispatch.DispatchCommand;
+import com.neca.perds.dispatch.DispatchDecision;
 import com.neca.perds.dispatch.DispatchEngine;
 import com.neca.perds.graph.Graph;
+import com.neca.perds.graph.EdgeStatus;
 import com.neca.perds.metrics.MetricsCollector;
 import com.neca.perds.model.Assignment;
 import com.neca.perds.model.DispatchCentre;
@@ -75,6 +77,10 @@ public final class PerdsController implements SystemCommandExecutor {
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(at, "at");
 
+        NodeId changedEdgeFrom = null;
+        NodeId changedEdgeTo = null;
+        boolean changedEdgeMayInvalidateRoutes = false;
+
         switch (command) {
             case SystemCommand.ReportIncidentCommand c -> {
                 incidents.put(c.incident().id(), c.incident());
@@ -86,12 +92,28 @@ public final class PerdsController implements SystemCommandExecutor {
             case SystemCommand.AddNodeCommand c -> graph.addNode(c.node());
             case SystemCommand.RemoveNodeCommand c -> graph.removeNode(c.nodeId());
             case SystemCommand.PutEdgeCommand c -> graph.putEdge(c.edge());
-            case SystemCommand.RemoveEdgeCommand c -> graph.removeEdge(c.from(), c.to());
-            case SystemCommand.UpdateEdgeCommand c -> graph.updateEdge(c.from(), c.to(), c.weights(), c.status());
+            case SystemCommand.RemoveEdgeCommand c -> {
+                graph.removeEdge(c.from(), c.to());
+                changedEdgeFrom = c.from();
+                changedEdgeTo = c.to();
+                changedEdgeMayInvalidateRoutes = true;
+            }
+            case SystemCommand.UpdateEdgeCommand c -> {
+                graph.updateEdge(c.from(), c.to(), c.weights(), c.status());
+                if (c.status() == EdgeStatus.CLOSED) {
+                    changedEdgeFrom = c.from();
+                    changedEdgeTo = c.to();
+                    changedEdgeMayInvalidateRoutes = true;
+                }
+            }
             case SystemCommand.RegisterUnitCommand c -> units.put(c.unit().id(), c.unit());
             case SystemCommand.SetUnitStatusCommand c -> setUnitStatus(c.unitId(), c.status());
             case SystemCommand.MoveUnitCommand c -> moveUnit(c.unitId(), c.newNodeId());
             case SystemCommand.PrepositionUnitsCommand c -> prepositionUnits(c.horizon(), at);
+        }
+
+        if (changedEdgeMayInvalidateRoutes) {
+            cancelAssignmentsUsingEdge(changedEdgeFrom, changedEdgeTo, at);
         }
 
         SystemSnapshot snapshot = snapshot(at);
@@ -109,7 +131,7 @@ public final class PerdsController implements SystemCommandExecutor {
     private void applyDispatchCommand(DispatchCommand command, Instant at) {
         switch (command) {
             case DispatchCommand.AssignUnitCommand c -> applyAssignment(c, at);
-            case DispatchCommand.RerouteUnitCommand ignored -> {}
+            case DispatchCommand.RerouteUnitCommand c -> applyReroute(c);
             case DispatchCommand.CancelAssignmentCommand c -> cancelAssignment(c.incidentId());
         }
     }
@@ -131,9 +153,10 @@ public final class PerdsController implements SystemCommandExecutor {
             return;
         }
 
+        Assignment assignment = new Assignment(command.incidentId(), command.unitId(), command.route(), at);
         assignments.put(
                 command.incidentId(),
-                new Assignment(command.incidentId(), command.unitId(), command.route(), at)
+                assignment
         );
 
         units.put(
@@ -159,6 +182,31 @@ public final class PerdsController implements SystemCommandExecutor {
                         incident.reportedAt(),
                         incident.resolvedAt()
                 )
+        );
+
+        metricsCollector.recordDispatchDecision(at, new DispatchDecision(assignment, command.rationale()));
+    }
+
+    private void applyReroute(DispatchCommand.RerouteUnitCommand command) {
+        ResponseUnit unit = requireUnit(command.unitId());
+        Optional<IncidentId> incidentId = unit.assignedIncidentId();
+        if (incidentId.isEmpty()) {
+            return;
+        }
+        Assignment assignment = assignments.get(incidentId.get());
+        if (assignment == null) {
+            return;
+        }
+        if (!assignment.unitId().equals(command.unitId())) {
+            return;
+        }
+        if (!command.newRoute().nodes().getFirst().equals(unit.currentNodeId())) {
+            return;
+        }
+
+        assignments.put(
+                assignment.incidentId(),
+                new Assignment(assignment.incidentId(), assignment.unitId(), command.newRoute(), assignment.assignedAt())
         );
     }
 
@@ -246,6 +294,39 @@ public final class PerdsController implements SystemCommandExecutor {
         return status == UnitStatus.EN_ROUTE || status == UnitStatus.ON_SCENE;
     }
 
+    private void cancelAssignmentsUsingEdge(NodeId from, NodeId to, Instant at) {
+        if (from == null || to == null) {
+            return;
+        }
+        if (assignments.isEmpty()) {
+            return;
+        }
+
+        var affectedIncidentIds = assignments.values().stream()
+                .filter(a -> routeUsesEdge(a.route(), from, to))
+                .map(Assignment::incidentId)
+                .toList();
+
+        for (IncidentId incidentId : affectedIncidentIds) {
+            DispatchCommand cancel = new DispatchCommand.CancelAssignmentCommand(
+                    incidentId,
+                    "Route invalidated: edge became unavailable (" + from + " -> " + to + ")"
+            );
+            applyDispatchCommand(cancel, at);
+            metricsCollector.recordDispatchCommandApplied(at, cancel);
+        }
+    }
+
+    private static boolean routeUsesEdge(com.neca.perds.routing.Route route, NodeId from, NodeId to) {
+        var nodes = route.nodes();
+        for (int i = 0; i < nodes.size() - 1; i++) {
+            if (nodes.get(i).equals(from) && nodes.get(i + 1).equals(to)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void cancelAssignment(IncidentId incidentId) {
         assignments.remove(incidentId);
         Incident incident = incidents.get(incidentId);
@@ -277,17 +358,22 @@ public final class PerdsController implements SystemCommandExecutor {
                 continue;
             }
 
-                units.put(
-                        unit.id(),
-                        new ResponseUnit(
-                                unit.id(),
-                                unit.type(),
-                                unit.status(),
-                                unit.currentNodeId(),
-                                Optional.empty(),
-                                unit.homeDispatchCentreId()
-                        )
-                );
+            UnitStatus newStatus = unit.status();
+            if (unit.status() == UnitStatus.EN_ROUTE || unit.status() == UnitStatus.ON_SCENE) {
+                newStatus = UnitStatus.AVAILABLE;
+            }
+
+            units.put(
+                    unit.id(),
+                    new ResponseUnit(
+                            unit.id(),
+                            unit.type(),
+                            newStatus,
+                            unit.currentNodeId(),
+                            Optional.empty(),
+                            unit.homeDispatchCentreId()
+                    )
+            );
         }
     }
 

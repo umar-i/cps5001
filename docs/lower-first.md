@@ -13,3 +13,7 @@ This document tracks progress toward the **Lower First Class** grade band.
 
 See `docs/todo-first.md`.
 
+## Implemented So Far
+
+- Adaptive rerouting: when an edge used by an active assignment is updated (closure/removal/weight change), the system recalculates a route from the unit's current node to the incident. If unreachable, it cancels the assignment and allows reassignment in the same step.
+

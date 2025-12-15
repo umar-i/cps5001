@@ -4,7 +4,7 @@ Goal: reach the **Lower First Class** software + report criteria from `requireme
 
 ## Software Artefact (Lower First)
 
-- [ ] Adapt to congestion: reroute active assignments when edge weights change (fallback to cancel + reassignment if unreachable)
+- [x] Adapt to congestion: reroute active assignments when edge weights change (fallback to cancel + reassignment if unreachable)
 - [ ] Predictive demand: implement a rate-based (windowed) demand predictor that reacts to incident spikes
 - [ ] Systematic pre-positioning: distribute available units across the top-demand zones (limit moves; respect unit availability)
 - [ ] Optimisation: keep allocation efficient (continue using multi-source routing; avoid per-unit rerouting where possible)

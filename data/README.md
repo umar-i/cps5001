@@ -10,3 +10,7 @@ Included samples:
 - `data/scenarios/mini-nodes.csv`
 - `data/scenarios/mini-edges.csv`
 - `data/scenarios/mini-events.csv`
+- `data/scenarios/edge-closure-events.csv`
+- `data/scenarios/grid-4x4-nodes.csv`
+- `data/scenarios/grid-4x4-edges.csv`
+- `data/scenarios/grid-4x4-events.csv`

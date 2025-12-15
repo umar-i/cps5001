@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant Scenario
+    participant Controller as PerdsController
+    participant Graph
+    participant Router
+    participant Dispatch as DispatchEngine
+
+    Scenario->>Controller: UPDATE_EDGE(from,to,weights,status)
+    Controller->>Graph: updateEdge(from,to,...)
+    Controller->>Controller: find assignments using edge
+
+    alt route exists
+        Controller->>Router: findRoute(unitNode, incidentNode)
+        Router-->>Controller: Route
+        Controller->>Controller: apply REROUTE_UNIT(unitId, route)
+    else unreachable
+        Controller->>Controller: apply CANCEL_ASSIGNMENT(incidentId)
+    end
+
+    Controller->>Dispatch: compute(snapshot)
+    Dispatch-->>Controller: dispatch commands
+    Controller->>Controller: apply commands

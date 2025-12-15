@@ -13,7 +13,7 @@ Goal: reach the **Lower First Class** software + report criteria from `requireme
 ## Evaluation / Visualisation
 
 - [ ] Add a larger-scale scenario (or generator) to exercise congestion + spikes + pre-positioning
-- [ ] Add a simple, reproducible metrics summary (CSV + printed table) suitable for the report
+- [x] Add a simple, reproducible metrics summary (CSV + printed table) suitable for the report
 
 ## Report Material (Lower First)
 

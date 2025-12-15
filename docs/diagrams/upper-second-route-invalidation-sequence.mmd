@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant Sim as SimulationEngine
+    participant Ctrl as PerdsController
+    participant G as Graph
+    participant D as DispatchEngine
+    participant M as MetricsCollector
+
+    Sim->>Ctrl: execute(UpdateEdgeCommand, t)
+    Ctrl->>G: updateEdge(from,to,...)
+    Ctrl->>Ctrl: cancel assignments using (from->to)
+    Ctrl->>M: recordDispatchCommandApplied(CANCEL_ASSIGNMENT)
+    Ctrl->>D: compute(snapshot)
+    D-->>Ctrl: [AssignUnitCommand...]
+    Ctrl->>Ctrl: applyAssignment(...)
+    Ctrl->>M: recordDispatchDecision(...)
+    Ctrl->>M: recordDispatchCommandApplied(ASSIGN_UNIT)
+

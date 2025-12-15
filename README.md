@@ -4,17 +4,17 @@ Java SE 21+ coursework project that simulates an emergency-response dispatch net
 
 ## Status
 
-- Current milestone: **2:2 deliverable implemented** (`docs/lower-second.md`).
-- Next milestone: **2:1 features** (stronger multi-criteria dispatch + caching/invalidation + broader evaluation).
+- Current milestone: **2:1 deliverable implemented** (`docs/upper-second.md`).
+- Next milestone: **First-Class features** (stronger prediction + systematic pre-positioning + larger-scale evaluation).
 
 ## What's Implemented
 
 - Dynamic weighted graph: adjacency-map representation (`com.neca.perds.graph`)
 - Routing: `DijkstraRouter` + `AStarRouter` + custom indexed binary-heap PQ (`com.neca.perds.routing`, `com.neca.perds.ds`)
-- Dispatch (simple): prioritise by severity/age, allocate nearest available matching unit type (`com.neca.perds.dispatch`)
+- Dispatch: prioritise by severity/age; allocate nearest eligible unit via routing (`com.neca.perds.dispatch`)
 - End-to-end cycle: commands -> dispatch decisions -> assignments applied (`com.neca.perds.app`, `com.neca.perds.sim`)
 - CSV loaders + scenario runner + metrics export (`com.neca.perds.io`, `com.neca.perds.metrics`, `com.neca.perds.cli`)
-- Basic reallocation on unit unavailability; simple demand prediction + hotspot pre-position command (`com.neca.perds.app`, `com.neca.perds.prediction`)
+- Reallocation on unit unavailability and on edge closures; simple demand prediction + hotspot pre-position command (`com.neca.perds.app`, `com.neca.perds.prediction`)
 - CLI demo + JUnit 5 tests (`com.neca.perds.cli`, `src/test/java/...`)
 
 ## Quick Start
@@ -47,6 +47,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 
 - Baseline deliverable: `docs/third-class.md`
 - 2:2 deliverable: `docs/lower-second.md`
+- 2:1 deliverable: `docs/upper-second.md`
 - Target architecture / APIs: `docs/architecture.md`
 - Evaluation plan: `docs/evaluation.md`
 - Ethics reflection notes: `docs/ethics.md`
@@ -56,7 +57,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 
 - [x] Third Class (40-49): dynamic graph + Dijkstra routing + simple dispatch + CLI demo + tests
 - [x] 2:2 (50-59): CSV scenario/network loading; basic reallocation; initial metrics exports; partial prediction + one pre-position action
-- [ ] 2:1 (60-69): stronger multi-criteria dispatch scoring; caching/invalidation strategy; broader simulation scenarios + empirical evaluation write-up
+- [x] 2:1 (60-69): efficient nearest-unit allocation; route invalidation on edge closure; expanded evaluation notes + diagrams
 - [ ] First (70+): predictive demand + systematic pre-positioning; larger-scale experiments; visualisation (CSV/diagrams) and report polish
 
 ## Constraints (Assessment)

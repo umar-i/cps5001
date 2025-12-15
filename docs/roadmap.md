@@ -19,12 +19,12 @@ Deliverables are cumulative: **Third → 2:2 → 2:1 → First**. Do not advance
 
 ## Upper Second (2:1) (60–69)
 
-- [ ] Efficient allocation algorithm (reduce routing recomputation)
-- [ ] Real-time update handling for route changes (reroute/cancel + reassignment)
-- [ ] Strengthen predictive logic/resource management integration
-- [ ] Add evaluation scenario(s) and empirical write-up (`docs/evaluation.md`)
-- [ ] Expand complexity analysis + diagrams for new components
-- [ ] Continue iterative development with branches + PRs (CI should pass)
+- [x] Efficient allocation algorithm (reduce routing recomputation)
+- [x] Real-time update handling for route changes (reroute/cancel + reassignment)
+- [x] Strengthen predictive logic/resource management integration
+- [x] Add evaluation scenario(s) and empirical write-up (`docs/evaluation.md`)
+- [x] Expand complexity analysis + diagrams for new components
+- [x] Continue iterative development with branches + PRs (CI should pass)
 
 ## First Class (70+)
 
@@ -32,4 +32,3 @@ Deliverables are cumulative: **Third → 2:2 → 2:1 → First**. Do not advance
 - [ ] Stronger predictive demand + systematic pre-positioning
 - [ ] Fairness/robustness considerations supported by metrics
 - [ ] Release tagging at milestones (e.g., `v0.3.0-21`)
-

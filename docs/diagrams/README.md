@@ -5,3 +5,4 @@ Store diagrams in text-first formats (e.g., Mermaid, PlantUML source, Graphviz `
 Current diagrams:
 - `docs/diagrams/third-class-class-diagram.mmd`
 - `docs/diagrams/third-class-dispatch-sequence.mmd`
+- `docs/diagrams/upper-second-route-invalidation-sequence.mmd`

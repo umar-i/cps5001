@@ -25,5 +25,5 @@ Goal: reach the **Lower First Class** software + report criteria from `requireme
 
 - [x] Use feature branches + small commits per task (no direct commits to `main`)
 - [x] Merge completed branches into `main` after tests
-- [ ] Tag milestones (e.g., `v0.3.0-21`, `v0.4.0-lower-first`)
+- [x] Tag milestones (e.g., `v0.3.0-21`, `v0.4.0-lower-first`)
 

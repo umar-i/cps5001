@@ -1,4 +1,4 @@
-# Lower First Class (70-79) Deliverable (In Progress)
+# Lower First Class (70-79) Deliverable (Implemented)
 
 This document tracks progress toward the **Lower First Class** grade band.
 

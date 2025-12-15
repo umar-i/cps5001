@@ -7,7 +7,7 @@ Goal: reach the **Lower First Class** software + report criteria from `requireme
 - [x] Adapt to congestion: reroute active assignments when edge weights change (fallback to cancel + reassignment if unreachable)
 - [x] Predictive demand: implement a rate-based (windowed) demand predictor that reacts to incident spikes
 - [x] Systematic pre-positioning: distribute available units across the top-demand zones (limit moves; respect unit availability)
-- [ ] Optimisation: keep allocation efficient (continue using multi-source routing; avoid per-unit rerouting where possible)
+- [x] Optimisation: keep allocation efficient (continue using multi-source routing; avoid per-unit rerouting where possible)
 - [x] Add targeted tests for rerouting, prediction, and pre-positioning
 
 ## Evaluation / Visualisation
@@ -17,13 +17,13 @@ Goal: reach the **Lower First Class** software + report criteria from `requireme
 
 ## Report Material (Lower First)
 
-- [ ] Add `docs/lower-first.md` with design notes + complexity analysis + diagrams
-- [ ] Update `docs/evaluation.md` with new scenarios + what to analyse
-- [ ] Update `docs/ethics.md` with fairness/robustness considerations tied to metrics
+- [x] Add `docs/lower-first.md` with design notes + complexity analysis + diagrams
+- [x] Update `docs/evaluation.md` with new scenarios + what to analyse
+- [x] Update `docs/ethics.md` with fairness/robustness considerations tied to metrics
 
 ## Version Control Evidence (Local-Only)
 
-- [ ] Use feature branches + small commits per task (no direct commits to `main`)
-- [ ] Merge completed branches into `main` after tests
+- [x] Use feature branches + small commits per task (no direct commits to `main`)
+- [x] Merge completed branches into `main` after tests
 - [ ] Tag milestones (e.g., `v0.3.0-21`, `v0.4.0-lower-first`)
 

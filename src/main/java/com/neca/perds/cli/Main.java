@@ -2,7 +2,7 @@ package com.neca.perds.cli;
 
 import com.neca.perds.app.PerdsController;
 import com.neca.perds.dispatch.DefaultDispatchEngine;
-import com.neca.perds.dispatch.NearestAvailableUnitPolicy;
+import com.neca.perds.dispatch.MultiSourceNearestAvailableUnitPolicy;
 import com.neca.perds.dispatch.SeverityThenOldestPrioritizer;
 import com.neca.perds.graph.AdjacencyMapGraph;
 import com.neca.perds.graph.Edge;
@@ -72,7 +72,7 @@ public final class Main {
         var graph = new AdjacencyMapGraph();
         var dispatchEngine = new DefaultDispatchEngine(
                 new SeverityThenOldestPrioritizer(),
-                new NearestAvailableUnitPolicy()
+                new MultiSourceNearestAvailableUnitPolicy()
         );
 
         var controller = new PerdsController(
@@ -148,7 +148,7 @@ public final class Main {
         InMemoryMetricsCollector metrics = new InMemoryMetricsCollector();
         var dispatchEngine = new DefaultDispatchEngine(
                 new SeverityThenOldestPrioritizer(),
-                new NearestAvailableUnitPolicy()
+                new MultiSourceNearestAvailableUnitPolicy()
         );
 
         try {

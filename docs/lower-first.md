@@ -16,4 +16,5 @@ See `docs/todo-first.md`.
 ## Implemented So Far
 
 - Adaptive rerouting: when an edge used by an active assignment is updated (closure/removal/weight change), the system recalculates a route from the unit's current node to the incident. If unreachable, it cancels the assignment and allows reassignment in the same step.
+- Sliding-window demand prediction: forecasts zone demand using a recent-time window, scaling recent incident counts into the requested prediction horizon.
 

@@ -1,0 +1,12 @@
+13	docs: clarify diagram page and add toc	docs/diagrams-toc	MERGED	2025-12-17T15:54:58Z
+12	docs: add current rendered diagrams	docs/current-diagrams	MERGED	2025-12-17T15:52:02Z
+11	docs: render Mermaid diagrams in GitHub	docs/render-diagrams	MERGED	2025-12-17T15:36:24Z
+10	docs: mention scalability and sustainability	docs/report-scalability	MERGED	2025-12-17T15:28:19Z
+9	docs: enforce 2400-word submission report	docs/report-2400	MERGED	2025-12-17T15:21:43Z
+8	docs: final report and evaluation outputs	docs/final-report	MERGED	2025-12-17T15:10:19Z
+7	docs: mark first-class workflow complete	docs/mark-first-class-complete	MERGED	2025-12-17T10:47:03Z
+6	feat: first-class (80-100) deliverable	feat/first-class	MERGED	2025-12-17T10:44:27Z
+4	chore: sync lower-first deliverable	chore/lower-first-sync	MERGED	2025-12-17T09:47:22Z
+3	feat: complete 2:1 (Upper Second) deliverable	feat/upper-second-deliverable	MERGED	2025-12-15T12:14:49Z
+2	feat: implement 2:2 deliverable	feat/lower-second-deliverable	MERGED	2025-12-14T10:33:51Z
+1	docs: refresh README with status and roadmap	docs-readme-refresh	MERGED	2025-12-14T09:30:00Z

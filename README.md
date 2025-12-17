@@ -45,7 +45,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 
 ## Documentation
 
-- Submission report (Markdown): `docs/report.md`
+- Submission report draft (Markdown): `docs/report.md`
 - Version control evidence for submission: `docs/vc-evidence/README.md`
 - Baseline deliverable: `docs/third-class.md`
 - 2:2 deliverable: `docs/lower-second.md`
@@ -57,9 +57,9 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 - Ethics reflection notes: `docs/ethics.md`
 - Diagrams (rendered on GitHub): `docs/diagrams/README.md`
 
-## Diagrams (Mermaid on GitHub)
+## Diagrams
 
-GitHub renders Mermaid diagrams when they are inside fenced code blocks (` ```mermaid ... ``` `). The rendered, up-to-date diagrams live in `docs/diagrams/README.md`.
+The rendered, up-to-date diagrams live in `docs/diagrams/README.md`.
 
 ## Roadmap (Grade Bands)
 

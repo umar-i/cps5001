@@ -10,13 +10,75 @@ This folder keeps two things:
 
 ## Current Diagrams (Latest System)
 
-- 1) System Class Diagram (Current)
-- 2) Per-Event Controller Step (Current)
-- 3) Edge Update: Targeted Reroute / Cancel (Current)
-- 4) Pre-positioning (Current)
-- 5) Synthetic Evaluation Runner (Current)
+- 1) Layered Architecture Diagram (Current)
+- 2) System Class Diagram (Current)
+- 3) Per-Event Controller Step (Current)
+- 4) Edge Update: Targeted Reroute / Cancel (Current)
+- 5) Pre-positioning (Current)
+- 6) Synthetic Evaluation Runner (Current)
 
-### 1) System Class Diagram (Current)
+### 1) Layered Architecture Diagram (Current)
+
+Source: `current-layered-architecture-diagram.mmd`
+
+```mermaid
+flowchart TB
+    classDef ext fill:#fdf6e3,stroke:#586e75,stroke-dasharray: 5 5
+
+    User["User / Assessor"]:::ext
+    Inputs["CSV Inputs\n(data/scenarios/*.csv)"]:::ext
+    Outputs["CSV Metrics + Tables\n(data/out/*, docs/results/*)"]:::ext
+
+    subgraph L1["Presentation Layer"]
+        CLI["CLI: Main\nCommands: demo | scenario | evaluate"]
+    end
+
+    subgraph L2["Application Layer (Orchestration)"]
+        Loader["CSV Loaders\n(CsvGraphLoader, CsvScenarioLoader)"]
+        Engine["SimulationEngine\n(PriorityQueue<TimedEvent>)"]
+        Controller["PerdsController\n(SystemCommandExecutor)"]
+    end
+
+    subgraph L3["Domain Layer (Decision Logic)"]
+        Dispatch["Dispatch\n(DefaultDispatchEngine + Policies)"]
+        Routing["Routing\n(DijkstraRouter / AStarRouter)"]
+        Prediction["Prediction + Pre-positioning\n(DemandPredictor + PrepositioningStrategy)"]
+    end
+
+    subgraph L4["Core Model + Data Structures"]
+        Model["Domain Model\n(Incident, ResponseUnit, Assignment, IDs)"]
+        Graph["Dynamic Graph\n(AdjacencyMapGraph)"]
+        Heap["Indexed Heap\n(BinaryHeapIndexedMinPriorityQueue)"]
+        RouteIndex["AssignmentRouteIndex\n(edge -> affected assignments)"]
+        Metrics["Metrics\n(InMemoryMetricsCollector, CsvMetricsExporter)"]
+    end
+
+    User --> CLI
+    Inputs --> Loader
+    Loader --> CLI
+
+    CLI --> Engine
+    Engine --> Controller
+
+    Controller --> Dispatch
+    Controller --> Prediction
+    Dispatch --> Routing
+    Prediction --> Routing
+
+    Controller --> Graph
+    Routing --> Graph
+    Routing --> Heap
+
+    Controller --> Model
+    Dispatch --> Model
+    Prediction --> Model
+    Controller --> RouteIndex
+
+    Controller --> Metrics
+    Metrics --> Outputs
+```
+
+### 2) System Class Diagram (Current)
 
 Source: `current-system-class-diagram.mmd`
 
@@ -178,7 +240,7 @@ classDiagram
     Main --> ScenarioSummary : aggregates
 ```
 
-### 2) Per-Event Controller Step (Current)
+### 3) Per-Event Controller Step (Current)
 
 Source: `current-controller-step-sequence.mmd`
 
@@ -224,7 +286,7 @@ sequenceDiagram
     end
 ```
 
-### 3) Edge Update: Targeted Reroute / Cancel (Current)
+### 4) Edge Update: Targeted Reroute / Cancel (Current)
 
 Source: `current-edge-update-reroute-sequence.mmd`
 
@@ -256,7 +318,7 @@ sequenceDiagram
     end
 ```
 
-### 4) Pre-positioning (Current)
+### 5) Pre-positioning (Current)
 
 Source: `lower-first-prepositioning-sequence.mmd`
 
@@ -281,7 +343,7 @@ sequenceDiagram
     Controller->>Controller: move available units
 ```
 
-### 5) Synthetic Evaluation Runner (Current)
+### 6) Synthetic Evaluation Runner (Current)
 
 Source: `first-class-evaluation-sequence.mmd`
 

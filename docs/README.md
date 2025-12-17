@@ -17,6 +17,7 @@ Suggested structure:
 - `docs/diagrams/` - class diagrams and sequence diagrams (text formats preferred).
 - `docs/evaluation.md` - empirical testing plan and results.
 - `docs/ethics.md` - ethical considerations and reflection.
+- `docs/results/` - small, report-ready evaluation outputs (tables/CSVs).
 
 Other top-level folders:
 - `.github/` - GitHub templates and CI workflows (PR template, issue templates, Actions).

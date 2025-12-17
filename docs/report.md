@@ -369,4 +369,25 @@ Notation used below:
 
 **Table 3: Synthetic evaluation aggregate metrics**
 
-TODO
+I ran the built-in synthetic evaluation with 10 runs and seed 1:
+
+- `java -jar target/perds-0.1.0-SNAPSHOT.jar evaluate data/scenarios/grid-4x4-nodes.csv data/scenarios/grid-4x4-edges.csv data/out/eval-report 10 1`
+
+The committed copy of the outputs (so you can view them without rerunning) is in `docs/results/`:
+
+- `docs/results/evaluation_aggregate.md`
+- `docs/results/evaluation_aggregate.csv`
+- `docs/results/evaluation_summary.csv`
+
+The big thing I cared about here was whether pre-positioning actually improves response ETA under disruptions (hotspot shift + congestion + outages), not whether it makes the code “look advanced”.
+
+| variant | runs | etaAvgSecondsMean | etaAvgSecondsP95Runs | waitAvgSecondsMean | waitAvgSecondsP95Runs | computeAvgMicrosMean | cancelCommandsMean | rerouteCommandsMean |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| adaptive_preposition | 10 | 21.66453140246082 | 24.431818181818183 | 307.7158466707499 | 467.5238095238095 | 55.836094674556215 | 0.0 | 16.0 |
+| no_preposition | 10 | 23.4413043015635 | 27.0 | 307.7158466707499 | 467.5238095238095 | 93.38343195266273 | 0.0 | 17.6 |
+| sliding_preposition | 10 | 21.807388545317966 | 24.431818181818183 | 307.7158466707499 | 467.5238095238095 | 62.658579881656806 | 0.0 | 16.3 |
+
+Notes (so I don’t oversell it):
+
+- The “wait” metrics are basically identical here because in this simulation incidents get dispatched immediately after they’re reported (unless something forces a cancel + requeue).
+- Compute times are machine-dependent. I’m including them because the brief asks for performance evidence, but the ETA trends are what I trust more.

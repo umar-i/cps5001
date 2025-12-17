@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    participant Sim as SimulationEngine
+    participant Ctrl as PerdsController
+    participant G as Graph
+    participant Index as AssignmentRouteIndex
+    participant Pred as DemandPredictor
+    participant Pre as PrepositioningStrategy
+    participant Eng as DispatchEngine
+    participant Metrics as MetricsCollector
+
+    Sim->>Ctrl: execute(SystemCommand, at)
+
+    alt ReportIncidentCommand
+        Ctrl->>Ctrl: incidents.put(incident)
+        Ctrl->>Pred: observe(incident)
+    end
+
+    alt UpdateEdgeCommand / RemoveEdgeCommand
+        Ctrl->>G: updateEdge/removeEdge(from,to,...)
+        Ctrl->>Index: incidentIdsUsingEdge(from,to)
+        loop each affected incidentId
+            Ctrl->>Ctrl: rerouteOrCancelAssignment(incidentId)
+            Ctrl->>Metrics: recordDispatchCommandApplied(REROUTE or CANCEL)
+        end
+    end
+
+    alt PrepositionUnitsCommand
+        Ctrl->>Pred: forecast(at, horizon)
+        Ctrl->>Pre: plan(snapshot, forecast)
+        Ctrl->>Ctrl: move available units
+    end
+
+    Ctrl->>Eng: compute(snapshot)
+    Ctrl->>Metrics: recordDispatchComputation(...)
+    loop each DispatchCommand
+        Ctrl->>Ctrl: applyDispatchCommand(...)
+        Ctrl->>Metrics: recordDispatchCommandApplied(...)
+    end

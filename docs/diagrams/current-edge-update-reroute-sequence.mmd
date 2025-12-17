@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    participant Scenario
+    participant Ctrl as PerdsController
+    participant G as Graph
+    participant Index as AssignmentRouteIndex
+    participant Router as DijkstraRouter
+    participant Metrics as MetricsCollector
+
+    Scenario->>Ctrl: execute(UpdateEdgeCommand/RemoveEdgeCommand, at)
+    Ctrl->>G: updateEdge/removeEdge(from,to,...)
+    Ctrl->>Index: incidentIdsUsingEdge(from,to)
+
+    loop each affected incidentId
+        Ctrl->>Router: findRoute(unitNode, incidentNode)
+        alt route exists
+            Router-->>Ctrl: Route
+            Ctrl->>Ctrl: apply REROUTE_UNIT(unitId, route)
+            Ctrl->>Metrics: recordDispatchCommandApplied(REROUTE_UNIT)
+        else unreachable
+            Router-->>Ctrl: empty
+            Ctrl->>Ctrl: apply CANCEL_ASSIGNMENT(incidentId)
+            Ctrl->>Metrics: recordDispatchCommandApplied(CANCEL_ASSIGNMENT)
+        end
+    end

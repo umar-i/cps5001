@@ -26,6 +26,10 @@ Deliverables are cumulative: **Third → 2:2 → 2:1 → First**. Do not advance
 - [x] Expand complexity analysis + diagrams for new components
 - [x] Continue iterative development with branches + PRs (CI should pass)
 
-## First Class (70+)
+## Lower First (70-79)
 
 - [x] Complete `docs/todo-first.md`
+
+## First Class (80-100)
+
+- [ ] Complete `docs/todo-first-class.md`

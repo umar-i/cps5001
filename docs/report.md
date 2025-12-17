@@ -101,7 +101,50 @@ Weights and closures:
 
 ### 2.2 Routing (Dijkstra + A*)
 
-TODO
+Routing lives in `com.neca.perds.routing`. I implemented two shortest-path routers:
+
+- `DijkstraRouter` (baseline, used in most places)
+- `AStarRouter` (same skeleton but adds a heuristic)
+
+I didn’t pick something exotic here. Dijkstra is predictable, and it fits the constraints: edge costs are non-negative (travel time / distance). Also, because the network updates at runtime, I didn’t want an algorithm that needs heavy pre-processing.
+
+**Cost model**
+
+Rather than baking “travel time” into the routing code, I used `EdgeCostFunction` so the router stays generic. Two cost functions are provided in `CostFunctions`:
+
+- `travelTimeSeconds()` → `edge.weights().travelTime().toSeconds()` for `OPEN` edges, otherwise `+∞`
+- `distanceKm()` → `edge.weights().distanceKm()` for `OPEN` edges, otherwise `+∞`
+
+That `+∞` trick is how closures work during routing: closed edges still exist in the graph (so you can reopen them), but they become unreachable for shortest-path.
+
+**Why a custom priority queue**
+
+This is the part where I stopped trusting the standard library. Java’s `PriorityQueue` doesn’t have a clean `decreaseKey`, which is a big deal for Dijkstra/A* if you want the normal complexity.
+
+So I wrote `BinaryHeapIndexedMinPriorityQueue` in `com.neca.perds.ds`:
+
+- It stores heap positions in an `int[] positions`, so “where is node X in the heap?” is `O(1)`.
+- `decreaseKey` becomes `O(log n)` by doing a `swim()` from the current heap position.
+
+It’s not fancy, but it’s explicit and testable (there’s a dedicated unit test class for it).
+
+**Implementation shape (Dijkstra)**
+
+`DijkstraRouter` builds a stable index for nodes (`Map<NodeId, Integer> indexByNodeId`) and then uses arrays:
+
+- `dist[]` for current best-known distance/cost
+- `prev[]` for path reconstruction
+
+That lets me avoid creating a ton of wrapper objects during routing. It also makes the complexity story straightforward:
+
+- Time: `O((V + E) log V)` with the binary heap.
+- Space: `O(V)` for the arrays + heap.
+
+**A* (optional optimisation)**
+
+`AStarRouter` is the same idea, except the priority in the open set is `fScore = gScore + heuristic(start → goal)`. The heuristic interface is `Heuristic.estimate(graph, from, goal)`.
+
+In this coursework, most scenarios don’t need A* because there aren’t coordinates everywhere (nodes can have no `GeoPoint`). But I kept it because it’s a clean extension point: if you do have coordinates, `EuclideanHeuristic` is ready to go.
 
 ### 2.3 Dispatch (prioritisation + unit selection)
 

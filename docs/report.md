@@ -192,7 +192,44 @@ Those components get exported to CSV (`dispatch_decisions.csv`) so I can actuall
 
 ### 2.4 Simulation and dynamic updates (events, reallocation, rerouting)
 
-TODO
+The “real-time” part is simulated with an event queue. I didn’t want threads here (it would make debugging and marking harder), so I went for a deterministic, event-driven loop:
+
+- `SimulationEngine` stores `TimedEvent`s in a `PriorityQueue` ordered by `Instant`.
+- A `TimedEvent` wraps a `SystemCommand` (sealed interface), so every state mutation is explicit and typed.
+- `PerdsController` implements `SystemCommandExecutor` and is basically the orchestrator: apply the command, handle any targeted updates, run dispatch, apply dispatch commands, record metrics.
+
+That last part (controller orchestration) is what makes the system feel “alive” even though it’s not truly concurrent.
+
+**Reallocation when units become unavailable**
+
+The rule I used is simple: if a unit is assigned to an incident and I change its status to something that can’t continue the assignment, I cancel the assignment and re-queue the incident.
+
+You can see this in `PerdsController.setUnitStatus(...)`:
+
+- It calls `cancelAssignment(...)` if the unit had an assigned incident and the new status is not compatible (`EN_ROUTE` or `ON_SCENE` are treated as compatible; everything else is not).
+- `cancelAssignment(...)` removes the assignment, sets the incident back to `QUEUED`, and clears the unit’s `assignedIncidentId` (and usually makes it `AVAILABLE` again).
+
+So the next dispatch cycle can pick a different unit.
+
+**Route changes (closures + congestion)**
+
+The graph supports two “bad things happen” cases:
+
+- `RemoveEdge` (road closure)
+- `UpdateEdge` (congestion → travel time changes, or closure via status)
+
+When an edge changes, I don’t want to scan every assignment route on every update. That gets ugly fast. So for the First-Class work I added `AssignmentRouteIndex`:
+
+- On every assignment / reroute, I index the unique edges in that `Route`.
+- On cancellation or resolution, I remove the incident from the index.
+- When an edge changes, I can ask: “which incidents currently have a route that uses `(from → to)`?”
+
+That’s exactly what `PerdsController.rerouteOrCancelAssignmentsUsingEdge(...)` does. For each affected assignment, the controller tries to recompute a route from the unit’s *current node* to the incident:
+
+- If a new route exists, it applies `DispatchCommand.RerouteUnitCommand`.
+- If there is no route (unreachable), it applies `DispatchCommand.CancelAssignmentCommand`, which queues the incident again for reassignment.
+
+It’s not perfect realism (the unit’s “current node” is coarse), but it demonstrates the key requirement: handle dynamic updates without rebuilding the whole world.
 
 ### 2.5 Prediction and pre-positioning
 

@@ -292,11 +292,37 @@ For quick feedback, I added `ScenarioSummary` which computes a small set of aggr
 
 ### 2.7 Testing + reliability
 
-TODO
+I used JUnit 5 and tried to keep tests small and “explainable”. If a test fails, I want to know *what broke* without reading 500 lines of setup.
+
+Main areas covered:
+
+- Data structures: `BinaryHeapIndexedMinPriorityQueueTest`
+- Routing: `DijkstraRouterTest`, `AStarRouterTest`
+- Dispatch policies: `NearestAvailableUnitPolicyTest`, `MultiSourceNearestAvailableUnitPolicyTest`
+- Controller behaviour under changes:
+  - reallocation when a unit becomes unavailable (`PerdsControllerReallocationTest`)
+  - route invalidation / cancellation on edge closure (`PerdsControllerRouteInvalidationTest`)
+  - reroute on congestion (travel time updates) (`PerdsControllerRerouteOnCongestionTest`)
+  - route index correctness (`AssignmentRouteIndexTest`)
+- I/O and evaluation plumbing: CSV loaders/exporter and summary stats (`CsvGraphLoaderTest`, `CsvScenarioLoaderTest`, `CsvMetricsExporterTest`, `ScenarioSummaryTest`)
+
+For the “First Class” evaluation code, I also tested the synthetic load generator so it stays deterministic for a fixed seed (`SyntheticLoadScenarioGeneratorTest`).
+
+Run tests:
+
+- `mvn test`
+- If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0" test`
 
 ### 2.8 Version control and development process
 
-TODO
+I treated version control as part of the deliverable, not an afterthought. The repo includes:
+
+- feature branching (topic branches instead of committing straight to `main`)
+- a PR template (`.github/PULL_REQUEST_TEMPLATE.md`) and issue templates
+- a GitHub Actions CI workflow (`.github/workflows/ci.yml`) that runs `mvn test` on PRs and on pushes to `main`
+- milestone tags for the grade-band checkpoints (`v0.3.0-21`, `v0.4.0-lower-first`, `v1.0.0-first`)
+
+That matters because it shows incremental development and makes it easier to review changes. It also helped me personally: when I broke routing during the multi-source work, I could bisect quickly instead of guessing.
 
 ## 3 Recommendations
 

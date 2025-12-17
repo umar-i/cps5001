@@ -73,7 +73,31 @@ This section explains the main parts of the implementation and the reasoning beh
 
 ### 2.1 Graph / network representation (dynamic updates)
 
-TODO
+I modelled the “country” as a directed weighted graph. The core class is `com.neca.perds.graph.AdjacencyMapGraph`.
+
+I went for an adjacency-map structure because it matches what the brief keeps pushing: the network changes at runtime (closures, congestion, adding/removing nodes), and I don’t want updates to be expensive. An adjacency matrix would make some lookups easy, but it would also waste memory on non-edges and make “remove node + all incident edges” feel clunky.
+
+Concrete structure (this is literally what the class stores):
+
+- `Map<NodeId, Node> nodes`
+- `Map<NodeId, Map<NodeId, Edge>> outgoing`
+
+So when I need an edge `(from -> to)`, it’s effectively a couple of `HashMap` lookups. When I need all outgoing edges from a node, I just iterate the inner map values.
+
+Dynamic update support is built-in:
+
+- `addNode(Node)` and `putEdge(Edge)` are average `O(1)` inserts.
+- `updateEdge(from, to, weights, status)` replaces the existing edge and throws if it doesn’t exist (I’d rather fail loudly than silently invent new roads).
+- `removeEdge(from, to)` is average `O(1)`.
+- `removeNode(id)` is the “expensive” one: it removes the node, its outgoing map, and then scans all other outgoing maps to remove incoming edges. That’s basically `O(V + E)` worst-case. I accepted that because node removals are rare compared to routing/dispatch.
+
+Every mutation increments a `version` counter (`GraphReadView.version()`), and every `Route` records the version it was computed against. I didn’t build a full cache, but that version stamp was still useful while testing (it makes it obvious when I’m looking at a stale route).
+
+Weights and closures:
+
+- `EdgeWeights` holds `distanceKm`, `travelTime` (a `Duration`), and a `resourceAvailability` factor in `[0,1]`.
+- `EdgeStatus` is `OPEN` / `CLOSED`.
+- Routing cost functions treat `CLOSED` edges as unreachable by returning `+∞` (see `com.neca.perds.routing.CostFunctions`).
 
 ### 2.2 Routing (Dijkstra + A*)
 
@@ -128,4 +152,3 @@ TODO
 **Table 3: Synthetic evaluation aggregate metrics**
 
 TODO
-

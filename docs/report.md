@@ -233,7 +233,35 @@ It’s not perfect realism (the unit’s “current node” is coarse), but it d
 
 ### 2.5 Prediction and pre-positioning
 
-TODO
+Prediction is deliberately lightweight (no ML libraries, and honestly I didn’t want a black box anyway). The point is to show how forecast information can *change dispatch behaviour* via proactive moves.
+
+The prediction API is small:
+
+- `DemandPredictor.observe(Incident)` updates history.
+- `DemandPredictor.forecast(at, horizon)` returns a `DemandForecast` with expected incident counts per zone.
+
+Zones are handled through `ZoneAssigner`. By default I assign `zone = nodeId` (so every node is its own zone), which keeps the scenarios simple and avoids having to invent a geographic clustering algorithm.
+
+**Predictors I implemented**
+
+- `ExponentialSmoothingDemandPredictor`: a decaying score per zone. Every observation decays existing scores by `(1 - alpha)` and adds `alpha` to the incident’s zone. It’s simple and reacts quickly, but it can also be “too smooth” if the hotspot shifts suddenly.
+- `SlidingWindowDemandPredictor`: keeps a queue of incident timestamps per zone for a fixed window (default 1 hour). Forecasting is basically “count incidents in the last window, then scale to the requested horizon”. This reacts to sudden changes better, but it’s noisier.
+- `AdaptiveEnsembleDemandPredictor` (First-Class step): blends multiple predictors and updates model weights online based on forecast error.
+
+The ensemble part is the most “interesting” algorithmically. I store pending forecasts (at time `t`, horizon `h`) and when `t + h` has passed, I compare what each model predicted vs what actually happened in that time window. Then I update weights with an exponential penalty (`newWeight = oldWeight * exp(-learningRate * error)`) and normalise.
+
+It’s not magic. It just means if one model keeps being wrong, it slowly loses influence, and the other model takes over.
+
+**Pre-positioning strategies**
+
+Pre-positioning is separate from prediction because I wanted to swap strategies without rewriting predictors.
+
+- `GreedyHotspotPrepositioningStrategy` (2:2 baseline): pick the highest-demand zone and move up to `maxMoves` available units there.
+- `MultiHotspotPrepositioningStrategy` (Lower First+): look at the top `maxZones` zones, allocate a limited number of moves proportionally to forecast demand, and for each move pick the nearest available unit.
+
+The multi-hotspot strategy reuses the same multi-source routing trick as dispatch (`VirtualSourceGraphView`). That way “choose nearest unit to target” is one routing call, not one call per unit.
+
+Finally, `PerdsController` applies the move plan when it receives `SystemCommand.PrepositionUnitsCommand`. In this simulation, moving a unit just updates its `currentNodeId`. That’s not realistic travel, but it makes the effect of “being in a better place before the next incident” measurable in a repeatable way.
 
 ### 2.6 Metrics + evaluation (export + aggregate)
 

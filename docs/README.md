@@ -8,7 +8,7 @@ Suggested structure:
 - `docs/lower-second.md` - 2:2 summary (implemented).
 - `docs/upper-second.md` - 2:1 summary (implemented).
 - `docs/lower-first.md` - Lower First summary (implemented).
-- `docs/first-class.md` - First Class summary (in progress).
+- `docs/first-class.md` - First Class summary (implemented).
 - `docs/roadmap.md` - milestone checklist (grade bands).
 - `docs/todo-21.md` - working TODO list for 2:1.
 - `docs/todo-first.md` - working TODO list for Lower First.

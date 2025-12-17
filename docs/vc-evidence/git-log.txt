@@ -1,0 +1,45 @@
+* 95eb6b1 (HEAD -> docs/vc-evidence, origin/main, main) docs: clarify diagram page and add toc
+* f020fec docs: add current rendered diagrams
+* 6c8789f docs: render Mermaid diagrams in GitHub
+* 2ac1f32 docs: mention scalability and sustainability
+* 29c9c07 docs: enforce 2400-word submission report
+* baa23f1 docs: final report and evaluation outputs
+* 52491d6 docs: mark first-class workflow complete (#7)
+* de44cc1 (tag: v1.0.0-first) feat: first-class (80-100) deliverable (#6)
+* d2b9d73 (tag: v0.4.0-lower-first) chore: sync lower-first deliverable (#4)
+| * 302e205 (chore/lower-first-milestone) docs: mark lower-first complete
+| *   66206c1 merge: lower-first writeup
+| |\  
+| | * bc6085d (docs/lower-first-writeup) docs: expand lower-first writeup
+| |/  
+| *   dea852c merge: grid scenario
+| |\  
+| | * 49ed353 (data/grid-scenario) feat: add grid evaluation scenario
+| |/  
+| *   040f040 merge: scenario summary
+| |\  
+| | * e6c3e3d (feat/scenario-summary) feat: print scenario metrics summary
+| |/  
+| *   61eea03 merge: systematic prepositioning
+| |\  
+| | * 461dbbb (feat/systematic-prepositioning) feat: add multi-hotspot prepositioning
+| |/  
+| *   8fb1796 merge: windowed demand predictor
+| |\  
+| | * d674eff (feat/windowed-demand-predictor) feat: add sliding-window demand predictor
+| |/  
+| *   4e99c1a merge: adaptive rerouting
+| |\  
+| | * 8549aae (feat/adaptive-rerouting) feat: reroute active assignments on edge updates
+| |/  
+| * 4f0478d merge: lower-first tracking docs
+|/| 
+| * 34059b7 (docs/lower-first-todo) docs: add lower-first deliverable tracker
+|/  
+* ba45ff0 (tag: v0.3.0-21) feat: complete 2:1 (Upper Second) deliverable (#3)
+* 151e8a7 feat: implement 2:2 deliverable
+* e88bd9c docs: refresh README with status and roadmap (#1)
+* 4cc92c7 chore: stop tracking requirements.txt
+* 508a7ae chore: stop tracking AGENTS.md
+* 1cd00bd chore: update gitignore
+* 18f0870 feat: capture third-class baseline

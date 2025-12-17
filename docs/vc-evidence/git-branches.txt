@@ -1,0 +1,11 @@
+  chore/lower-first-milestone    302e205 docs: mark lower-first complete
+  data/grid-scenario             49ed353 feat: add grid evaluation scenario
+  docs/lower-first-todo          34059b7 docs: add lower-first deliverable tracker
+  docs/lower-first-writeup       bc6085d docs: expand lower-first writeup
+* docs/vc-evidence               95eb6b1 docs: clarify diagram page and add toc
+  feat/adaptive-rerouting        8549aae feat: reroute active assignments on edge updates
+  feat/scenario-summary          e6c3e3d feat: print scenario metrics summary
+  feat/systematic-prepositioning 461dbbb feat: add multi-hotspot prepositioning
+  feat/windowed-demand-predictor d674eff feat: add sliding-window demand predictor
+  main                           95eb6b1 [origin/main] docs: clarify diagram page and add toc
+  remotes/origin/main            95eb6b1 docs: clarify diagram page and add toc

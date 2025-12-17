@@ -24,8 +24,8 @@ import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
 import com.neca.perds.model.UnitStatus;
 import com.neca.perds.model.UnitType;
+import com.neca.perds.prediction.AdaptiveEnsembleDemandPredictor;
 import com.neca.perds.prediction.MultiHotspotPrepositioningStrategy;
-import com.neca.perds.prediction.SlidingWindowDemandPredictor;
 import com.neca.perds.sim.SimulationEngine;
 import com.neca.perds.sim.SystemCommand;
 
@@ -81,7 +81,7 @@ public final class Main {
         var controller = new PerdsController(
                 graph,
                 dispatchEngine,
-                new SlidingWindowDemandPredictor(),
+                new AdaptiveEnsembleDemandPredictor(),
                 new MultiHotspotPrepositioningStrategy(),
                 new InMemoryMetricsCollector()
         );
@@ -156,7 +156,7 @@ public final class Main {
 
         try {
             var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
-            var demandPredictor = new SlidingWindowDemandPredictor();
+            var demandPredictor = new AdaptiveEnsembleDemandPredictor();
             var prepositioning = new MultiHotspotPrepositioningStrategy();
             var controller = new PerdsController(graph, dispatchEngine, demandPredictor, prepositioning, metrics);
 

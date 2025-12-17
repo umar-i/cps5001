@@ -196,6 +196,6 @@ The repo uses feature branches, PRs, CI, and milestone tags. Concretely: there i
 
 ## 8. Conclusion (what is strong, what is weak, and what I would fix next)
 
-Strengths: the core algorithms are explicit, testable, and match the brief. The dispatch layer improved from per-unit routing to multi-source routing. Dynamic updates are handled locally (reroute only affected assignments). Evaluation outputs exist and are reproducible.
+Strengths: the core algorithms are explicit, testable, and match the brief. The innovation was moving from per-unit routing to multi-source routing. Dynamic updates are handled locally (reroute only affected assignments). Evaluation outputs exist and are reproducible.
 
-Weaknesses: realism is limited (no continuous movement), fairness is measured but not enforced, and prediction is simple by design. If I had more time, I would add a movement model, introduce coverage constraints, and expand evaluation to larger graphs and closure-heavy scenarios. That is the honest path to a more credible system.
+Weaknesses: limited realism (no continuous movement), fairness is measured not enforced, and prediction is simple by design. If I had more time, I would add movement, coverage constraints, and expand evaluation to larger graphs to stress-test scalability and sustainability under closure-heavy scenarios. That is the honest path to a more credible system.

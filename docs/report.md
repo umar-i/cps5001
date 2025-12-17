@@ -148,7 +148,47 @@ In this coursework, most scenarios don’t need A* because there aren’t coordi
 
 ### 2.3 Dispatch (prioritisation + unit selection)
 
-TODO
+Dispatch is split into two parts on purpose:
+
+- `DefaultDispatchEngine` decides *which incidents to consider first* and turns decisions into `DispatchCommand`s.
+- A `DispatchPolicy` answers a narrower question: “for this one incident, which unit should I pick?”
+
+That separation saved me from mixing orchestration logic with routing logic, and it made testing easier (I can test a policy in isolation with a small snapshot).
+
+**Incident prioritisation**
+
+I used `SeverityThenOldestPrioritizer`. It does exactly what it says: higher severity first, then earlier `reportedAt`. It’s simple, but it hits the brief’s “severity + time” requirement and keeps behaviour deterministic.
+
+**Avoiding double-assigning the same unit**
+
+One subtle problem: during one dispatch compute cycle, you can accidentally assign the same unit to multiple incidents if you always look at the original snapshot.
+
+`DefaultDispatchEngine.compute()` keeps “working” copies:
+
+- `workingUnits` (a map keyed by `UnitId`)
+- `workingAssignments` (a list)
+
+After it picks a unit for an incident, it marks that unit as `EN_ROUTE` in `workingUnits` before moving to the next incident. So later incidents won’t see that unit as available anymore.
+
+**Unit selection policy**
+
+There are two policies in `com.neca.perds.dispatch`:
+
+- `NearestAvailableUnitPolicy` (baseline): loops every eligible unit and runs routing for each one.
+- `MultiSourceNearestAvailableUnitPolicy` (improved): runs routing once by using a “virtual source”.
+
+The multi-source one is the interesting part. The trick is `VirtualSourceGraphView`: it wraps the real graph and injects one extra node (`__VIRTUAL_SOURCE__`) with zero-cost edges to every node that currently has at least one eligible available unit.
+
+Then the policy runs one shortest-path query from that virtual node to the incident location. The first real node in the resulting path tells you which unit-start node is closest. If multiple units sit on that same start node, I just pick the lexicographically smallest `UnitId` as a deterministic tie-break.
+
+**Scoring / rationale**
+
+I kept the scoring transparent rather than “clever”. Each assignment records a `DispatchRationale` with:
+
+- a numeric score (right now: `-route.totalCost()` so “shorter route” = higher score)
+- components (`travelTimeSeconds`, `distanceKm`, `severityLevel`)
+
+Those components get exported to CSV (`dispatch_decisions.csv`) so I can actually explain decisions in the report instead of hand-waving.
 
 ### 2.4 Simulation and dynamic updates (events, reallocation, rerouting)
 

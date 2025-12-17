@@ -58,16 +58,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 
 ## Diagrams (Mermaid on GitHub)
 
-GitHub renders Mermaid diagrams when they are inside fenced code blocks like this:
-
-```mermaid
-sequenceDiagram
-    participant A
-    participant B
-    A->>B: Hello
-```
-
-All project diagrams are stored as Mermaid source (`docs/diagrams/*.mmd`) and also embedded in `docs/diagrams/README.md` so they render directly on GitHub.
+GitHub renders Mermaid diagrams when they are inside fenced code blocks (` ```mermaid ... ``` `). The rendered, up-to-date diagrams live in `docs/diagrams/README.md`.
 
 ## Roadmap (Grade Bands)
 

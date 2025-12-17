@@ -79,9 +79,9 @@ final class ScenarioSummaryTest {
         assertEquals(1, summary.rerouteCommands());
         assertEquals(1, summary.cancelCommands());
 
-        assertEquals(20.0, summary.computeAvgMillis(), 1e-9);
-        assertEquals(30, summary.computeP95Millis());
-        assertEquals(30, summary.computeMaxMillis());
+        assertEquals(20_000.0, summary.computeAvgMicros(), 1e-9);
+        assertEquals(30_000, summary.computeP95Micros());
+        assertEquals(30_000, summary.computeMaxMicros());
 
         assertEquals(150.0, summary.etaAvgSeconds(), 1e-9);
         assertEquals(200, summary.etaP95Seconds());
@@ -94,4 +94,3 @@ final class ScenarioSummaryTest {
         return new Route(List.of(new NodeId(start), new NodeId(end)), seconds, 0.0, Duration.ofSeconds(seconds), 1L);
     }
 }
-

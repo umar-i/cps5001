@@ -25,9 +25,9 @@ public record ScenarioSummary(
         long assignCommands,
         long rerouteCommands,
         long cancelCommands,
-        double computeAvgMillis,
-        long computeP95Millis,
-        long computeMaxMillis,
+        double computeAvgMicros,
+        long computeP95Micros,
+        long computeMaxMicros,
         double etaAvgSeconds,
         long etaP95Seconds,
         double waitAvgSeconds,
@@ -51,9 +51,9 @@ public record ScenarioSummary(
             }
         }
 
-        List<Long> computeMillis = new ArrayList<>();
+        List<Long> computeMicros = new ArrayList<>();
         for (var record : metrics.computations()) {
-            computeMillis.add(record.elapsed().toMillis());
+            computeMicros.add(record.elapsed().toNanos() / 1_000);
         }
 
         Map<IncidentId, Instant> reportedAtByIncidentId = new HashMap<>();
@@ -83,9 +83,9 @@ public record ScenarioSummary(
                 assigns,
                 reroutes,
                 cancels,
-                average(computeMillis),
-                percentile(computeMillis, 0.95),
-                max(computeMillis),
+                average(computeMicros),
+                percentile(computeMicros, 0.95),
+                max(computeMicros),
                 average(etaSeconds),
                 percentile(etaSeconds, 0.95),
                 average(waitSeconds),
@@ -128,4 +128,3 @@ public record ScenarioSummary(
         return sorted.get(index);
     }
 }
-

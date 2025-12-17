@@ -292,7 +292,7 @@ public final class Main {
 
     private static SyntheticLoadConfig defaultLoadConfig(int nodeCount) {
         int unitCount = Math.min(40, Math.max(10, nodeCount / 4));
-        int incidentCount = unitCount * 20;
+        int incidentCount = unitCount * 5;
         int congestionEvents = Math.max(20, nodeCount * 3);
         int unitOutages = Math.max(0, unitCount / 4);
 
@@ -360,7 +360,7 @@ public final class Main {
         Path aggregateMd = outDir.resolve("evaluation_aggregate.md");
 
         try (var writer = Files.newBufferedWriter(summaryCsv)) {
-            writer.write("run,seed,variant,incidentsTotal,incidentsResolved,incidentsQueued,unitsTotal,decisions,assignCommands,rerouteCommands,cancelCommands,computeAvgMillis,computeP95Millis,computeMaxMillis,etaAvgSeconds,etaP95Seconds,waitAvgSeconds,waitP95Seconds,predictorWeights");
+            writer.write("run,seed,variant,incidentsTotal,incidentsResolved,incidentsQueued,unitsTotal,decisions,assignCommands,rerouteCommands,cancelCommands,computeAvgMicros,computeP95Micros,computeMaxMicros,etaAvgSeconds,etaP95Seconds,waitAvgSeconds,waitP95Seconds,predictorWeights");
             writer.newLine();
             for (EvaluationRow row : rows) {
                 ScenarioSummary s = row.summary();
@@ -376,9 +376,9 @@ public final class Main {
                         String.valueOf(s.assignCommands()),
                         String.valueOf(s.rerouteCommands()),
                         String.valueOf(s.cancelCommands()),
-                        String.valueOf(s.computeAvgMillis()),
-                        String.valueOf(s.computeP95Millis()),
-                        String.valueOf(s.computeMaxMillis()),
+                        String.valueOf(s.computeAvgMicros()),
+                        String.valueOf(s.computeP95Micros()),
+                        String.valueOf(s.computeMaxMicros()),
                         String.valueOf(s.etaAvgSeconds()),
                         String.valueOf(s.etaP95Seconds()),
                         String.valueOf(s.waitAvgSeconds()),
@@ -395,7 +395,7 @@ public final class Main {
         }
 
         try (var writer = Files.newBufferedWriter(aggregateCsv)) {
-            writer.write("variant,runs,etaAvgSecondsMean,etaAvgSecondsP95Runs,waitAvgSecondsMean,waitAvgSecondsP95Runs,computeAvgMillisMean,cancelCommandsMean,rerouteCommandsMean");
+            writer.write("variant,runs,etaAvgSecondsMean,etaAvgSecondsP95Runs,waitAvgSecondsMean,waitAvgSecondsP95Runs,computeAvgMicrosMean,cancelCommandsMean,rerouteCommandsMean");
             writer.newLine();
 
             for (var entry : byVariant.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
@@ -404,7 +404,7 @@ public final class Main {
 
                 List<Double> etaAvg = variantRows.stream().map(r -> r.summary().etaAvgSeconds()).toList();
                 List<Double> waitAvg = variantRows.stream().map(r -> r.summary().waitAvgSeconds()).toList();
-                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMillis()).toList();
+                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMicros()).toList();
                 List<Double> cancels = variantRows.stream().map(r -> (double) r.summary().cancelCommands()).toList();
                 List<Double> reroutes = variantRows.stream().map(r -> (double) r.summary().rerouteCommands()).toList();
 
@@ -441,7 +441,7 @@ public final class Main {
             writer.newLine();
             writer.newLine();
 
-            writer.write("| variant | runs | etaAvgSecondsMean | etaAvgSecondsP95Runs | waitAvgSecondsMean | waitAvgSecondsP95Runs | computeAvgMillisMean | cancelCommandsMean | rerouteCommandsMean |");
+            writer.write("| variant | runs | etaAvgSecondsMean | etaAvgSecondsP95Runs | waitAvgSecondsMean | waitAvgSecondsP95Runs | computeAvgMicrosMean | cancelCommandsMean | rerouteCommandsMean |");
             writer.newLine();
             writer.write("|---|---:|---:|---:|---:|---:|---:|---:|---:|");
             writer.newLine();
@@ -452,7 +452,7 @@ public final class Main {
 
                 List<Double> etaAvg = variantRows.stream().map(r -> r.summary().etaAvgSeconds()).toList();
                 List<Double> waitAvg = variantRows.stream().map(r -> r.summary().waitAvgSeconds()).toList();
-                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMillis()).toList();
+                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMicros()).toList();
                 List<Double> cancels = variantRows.stream().map(r -> (double) r.summary().cancelCommands()).toList();
                 List<Double> reroutes = variantRows.stream().map(r -> (double) r.summary().rerouteCommands()).toList();
 

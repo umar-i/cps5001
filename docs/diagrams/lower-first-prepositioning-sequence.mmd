@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant Scenario
+    participant Controller as PerdsController
+    participant Predictor as DemandPredictor
+    participant Strategy as PrepositioningStrategy
+    participant Router
+
+    Scenario->>Controller: PREPOSITION_UNITS(horizon)
+    Controller->>Predictor: forecast(at, horizon)
+    Controller->>Strategy: plan(snapshot, forecast)
+
+    loop up to maxMoves
+        Strategy->>Router: findRoute(VirtualSourceGraph, zoneNode)
+        Router-->>Strategy: Route (startNode -> zoneNode)
+    end
+
+    Strategy-->>Controller: RepositionPlan(moves)
+    Controller->>Controller: move available units

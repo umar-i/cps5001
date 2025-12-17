@@ -28,7 +28,4 @@ Deliverables are cumulative: **Third → 2:2 → 2:1 → First**. Do not advance
 
 ## First Class (70+)
 
-- [ ] Larger-scale experiments + visualisation (CSV/diagrams)
-- [ ] Stronger predictive demand + systematic pre-positioning
-- [ ] Fairness/robustness considerations supported by metrics
-- [ ] Release tagging at milestones (e.g., `v0.3.0-21`)
+- [x] Complete `docs/todo-first.md`

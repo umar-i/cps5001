@@ -16,6 +16,7 @@ import com.neca.perds.model.Incident;
 import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.IncidentSeverity;
 import com.neca.perds.model.IncidentStatus;
+import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.Node;
 import com.neca.perds.model.NodeId;
 import com.neca.perds.model.NodeType;
@@ -23,8 +24,8 @@ import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
 import com.neca.perds.model.UnitStatus;
 import com.neca.perds.model.UnitType;
-import com.neca.perds.prediction.ExponentialSmoothingDemandPredictor;
-import com.neca.perds.prediction.GreedyHotspotPrepositioningStrategy;
+import com.neca.perds.prediction.MultiHotspotPrepositioningStrategy;
+import com.neca.perds.prediction.SlidingWindowDemandPredictor;
 import com.neca.perds.sim.SimulationEngine;
 import com.neca.perds.sim.SystemCommand;
 
@@ -32,6 +33,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -78,8 +81,8 @@ public final class Main {
         var controller = new PerdsController(
                 graph,
                 dispatchEngine,
-                new ExponentialSmoothingDemandPredictor(),
-                new GreedyHotspotPrepositioningStrategy(),
+                new SlidingWindowDemandPredictor(),
+                new MultiHotspotPrepositioningStrategy(),
                 new InMemoryMetricsCollector()
         );
 
@@ -153,8 +156,8 @@ public final class Main {
 
         try {
             var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
-            var demandPredictor = new ExponentialSmoothingDemandPredictor();
-            var prepositioning = new GreedyHotspotPrepositioningStrategy();
+            var demandPredictor = new SlidingWindowDemandPredictor();
+            var prepositioning = new MultiHotspotPrepositioningStrategy();
             var controller = new PerdsController(graph, dispatchEngine, demandPredictor, prepositioning, metrics);
 
             var events = new CsvScenarioLoader().load(eventsCsv);
@@ -177,10 +180,74 @@ public final class Main {
             System.out.println("Executed events: " + executed.size());
             System.out.println("Incidents: total=" + snapshot.incidents().size() + " resolved=" + resolved + " queued=" + queued);
             System.out.println("Assignments: total=" + snapshot.assignments().size());
+            printSummary(snapshot, metrics, executed);
         } catch (IOException e) {
             System.err.println("I/O error: " + e.getMessage());
         } catch (RuntimeException e) {
             System.err.println("Error: " + e.getMessage());
         }
+    }
+
+    private static void printSummary(com.neca.perds.system.SystemSnapshot snapshot, InMemoryMetricsCollector metrics, java.util.List<com.neca.perds.sim.TimedEvent> executed) {
+        long computations = metrics.computations().size();
+        long totalComputeMillis = 0;
+        long maxComputeMillis = 0;
+        for (var record : metrics.computations()) {
+            long elapsedMillis = record.elapsed().toMillis();
+            totalComputeMillis += elapsedMillis;
+            maxComputeMillis = Math.max(maxComputeMillis, elapsedMillis);
+        }
+
+        long assigns = 0;
+        long reroutes = 0;
+        long cancels = 0;
+        for (var record : metrics.commandsApplied()) {
+            switch (record.command()) {
+                case com.neca.perds.dispatch.DispatchCommand.AssignUnitCommand ignored -> assigns++;
+                case com.neca.perds.dispatch.DispatchCommand.RerouteUnitCommand ignored -> reroutes++;
+                case com.neca.perds.dispatch.DispatchCommand.CancelAssignmentCommand ignored -> cancels++;
+            }
+        }
+
+        Map<IncidentId, Instant> reportedAtByIncidentId = new HashMap<>();
+        for (var incident : snapshot.incidents()) {
+            reportedAtByIncidentId.put(incident.id(), incident.reportedAt());
+        }
+
+        long decisions = metrics.decisions().size();
+        long totalEtaSeconds = 0;
+        long totalWaitSeconds = 0;
+        long waitSamples = 0;
+        for (var record : metrics.decisions()) {
+            var assignment = record.decision().assignment();
+            totalEtaSeconds += assignment.route().totalTravelTime().toSeconds();
+
+            Instant reportedAt = reportedAtByIncidentId.get(assignment.incidentId());
+            if (reportedAt != null && !record.at().isBefore(reportedAt)) {
+                totalWaitSeconds += Duration.between(reportedAt, record.at()).toSeconds();
+                waitSamples++;
+            }
+        }
+
+        long prepositionCommands = executed.stream().filter(e -> e.command() instanceof com.neca.perds.sim.SystemCommand.PrepositionUnitsCommand).count();
+        long edgeUpdates = executed.stream().filter(e -> e.command() instanceof com.neca.perds.sim.SystemCommand.UpdateEdgeCommand).count();
+
+        System.out.println("Dispatch summary:");
+        if (computations > 0) {
+            System.out.println("  compute: count=" + computations
+                    + " avgMs=" + (totalComputeMillis / (double) computations)
+                    + " maxMs=" + maxComputeMillis);
+        } else {
+            System.out.println("  compute: count=0");
+        }
+        if (decisions > 0) {
+            System.out.println("  decisions: count=" + decisions
+                    + " avgEtaS=" + (totalEtaSeconds / (double) decisions)
+                    + " avgWaitS=" + (waitSamples == 0 ? "n/a" : String.valueOf(totalWaitSeconds / (double) waitSamples)));
+        } else {
+            System.out.println("  decisions: count=0");
+        }
+        System.out.println("  commands: assign=" + assigns + " reroute=" + reroutes + " cancel=" + cancels);
+        System.out.println("  events: preposition=" + prepositionCommands + " edgeUpdates=" + edgeUpdates);
     }
 }

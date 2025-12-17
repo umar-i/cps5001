@@ -4,8 +4,8 @@ Java SE 21+ coursework project that simulates an emergency-response dispatch net
 
 ## Status
 
-- Current milestone: **2:1 deliverable implemented** (`docs/upper-second.md`).
-- Next milestone: **First-Class features** (stronger prediction + systematic pre-positioning + larger-scale evaluation).
+- Current milestone: **Lower First deliverable implemented** (`docs/lower-first.md`).
+- Next milestone: **First-Class (80-100) enhancements** (adaptive prediction + deeper evaluation/visualisation + report polish).
 
 ## What's Implemented
 
@@ -48,6 +48,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 - Baseline deliverable: `docs/third-class.md`
 - 2:2 deliverable: `docs/lower-second.md`
 - 2:1 deliverable: `docs/upper-second.md`
+- Lower First deliverable: `docs/lower-first.md`
 - Target architecture / APIs: `docs/architecture.md`
 - Evaluation plan: `docs/evaluation.md`
 - Ethics reflection notes: `docs/ethics.md`
@@ -58,7 +59,8 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 - [x] Third Class (40-49): dynamic graph + Dijkstra routing + simple dispatch + CLI demo + tests
 - [x] 2:2 (50-59): CSV scenario/network loading; basic reallocation; initial metrics exports; partial prediction + one pre-position action
 - [x] 2:1 (60-69): efficient nearest-unit allocation; route invalidation on edge closure; expanded evaluation notes + diagrams
-- [ ] First (70+): predictive demand + systematic pre-positioning; larger-scale experiments; visualisation (CSV/diagrams) and report polish
+- [x] Lower First (70-79): predictive demand + multi-hotspot pre-positioning; rerouting on congestion; larger-scale scenario + summary metrics
+- [ ] First (80-100): adaptive prediction + deeper evaluation/visualisation + report polish
 
 ## Constraints (Assessment)
 

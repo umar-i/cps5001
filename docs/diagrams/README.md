@@ -1,19 +1,49 @@
-# Diagrams
+# Diagrams (Rendered On GitHub)
 
-Store diagrams in text-first formats (e.g., Mermaid, PlantUML source, Graphviz `.dot`) so they can be version-controlled.
+GitHub renders Mermaid diagrams **only** when they are inside a Markdown fence:
 
-GitHub only renders Mermaid when the diagram is inside a Markdown code fence (` ```mermaid ... ``` `).
-The `.mmd` files in this folder are raw Mermaid source; the sections below embed the same content so it renders directly on GitHub.
+```mermaid
+sequenceDiagram
+    A->>B: hello
+```
 
-If you edit a `.mmd` file, copy/paste its contents into the matching Mermaid block below.
+This folder keeps two things:
 
-## Third Class: Class Diagram
+- **Current diagrams (rendered below)**: these represent the latest system.
+- **Legacy diagrams (not rendered)**: older snapshots kept as reference only.
 
-Source: `third-class-class-diagram.mmd`
+## Current Diagrams (Latest System)
+
+### 1) System Class Diagram (Current)
+
+Source: `current-system-class-diagram.mmd`
 
 ```mermaid
 classDiagram
     direction LR
+
+    class Main
+    class CsvGraphLoader
+    class CsvScenarioLoader
+    class SimulationEngine
+    class TimedEvent
+    class SystemCommand
+    class SystemCommandExecutor {
+        <<interface>>
+        +execute(SystemCommand, Instant)
+    }
+
+    Main --> CsvGraphLoader : loads
+    Main --> CsvScenarioLoader : loads
+    Main --> SimulationEngine : schedules
+    Main --> SystemCommandExecutor : drives
+
+    SimulationEngine --> TimedEvent : priority queue
+    TimedEvent --> SystemCommand : contains
+    SystemCommandExecutor --> SystemCommand : executes
+
+    class PerdsController
+    SystemCommandExecutor <|.. PerdsController
 
     class GraphReadView {
         <<interface>>
@@ -36,20 +66,56 @@ classDiagram
     class Graph {
         <<interface>>
     }
-
     GraphReadView <|-- Graph
     GraphWriteOps <|-- Graph
 
     class AdjacencyMapGraph
     Graph <|.. AdjacencyMapGraph
+    PerdsController --> Graph : owns
+
+    class AssignmentRouteIndex
+    PerdsController --> AssignmentRouteIndex : indexes routes
+
+    class DispatchEngine {
+        <<interface>>
+        +compute(SystemSnapshot) List~DispatchCommand~
+    }
+    class DefaultDispatchEngine
+    DispatchEngine <|.. DefaultDispatchEngine
+    PerdsController --> DispatchEngine : computes
+
+    class IncidentPrioritizer {
+        <<interface>>
+        +comparator() Comparator~Incident~
+    }
+    class SeverityThenOldestPrioritizer
+    IncidentPrioritizer <|.. SeverityThenOldestPrioritizer
+    DefaultDispatchEngine --> IncidentPrioritizer : orders incidents
+
+    class DispatchPolicy {
+        <<interface>>
+        +choose(SystemSnapshot, Incident) Optional~DispatchDecision~
+    }
+    class NearestAvailableUnitPolicy
+    class MultiSourceNearestAvailableUnitPolicy
+    DispatchPolicy <|.. NearestAvailableUnitPolicy
+    DispatchPolicy <|.. MultiSourceNearestAvailableUnitPolicy
+    DefaultDispatchEngine --> DispatchPolicy : selects unit
 
     class Router {
         <<interface>>
         +findRoute(GraphReadView, NodeId, NodeId, EdgeCostFunction) Optional~Route~
     }
-
     class DijkstraRouter
+    class AStarRouter
     Router <|.. DijkstraRouter
+    Router <|.. AStarRouter
+    NearestAvailableUnitPolicy --> Router : routes
+    MultiSourceNearestAvailableUnitPolicy --> Router : routes
+
+    class VirtualSourceGraphView
+    GraphReadView <|.. VirtualSourceGraphView
+    MultiSourceNearestAvailableUnitPolicy --> VirtualSourceGraphView : wraps graph
 
     class IndexedMinPriorityQueue {
         <<interface>>
@@ -60,118 +126,135 @@ classDiagram
     class BinaryHeapIndexedMinPriorityQueue
     IndexedMinPriorityQueue <|.. BinaryHeapIndexedMinPriorityQueue
     DijkstraRouter --> IndexedMinPriorityQueue : uses
+    AStarRouter --> IndexedMinPriorityQueue : uses
 
-    class DispatchEngine {
+    class DemandPredictor {
         <<interface>>
-        +compute(SystemSnapshot) List~DispatchCommand~
+        +observe(Incident)
+        +forecast(Instant, Duration) DemandForecast
     }
-    class DefaultDispatchEngine
-    DispatchEngine <|.. DefaultDispatchEngine
+    class AdaptiveEnsembleDemandPredictor
+    class SlidingWindowDemandPredictor
+    class ExponentialSmoothingDemandPredictor
+    DemandPredictor <|.. AdaptiveEnsembleDemandPredictor
+    DemandPredictor <|.. SlidingWindowDemandPredictor
+    DemandPredictor <|.. ExponentialSmoothingDemandPredictor
+    PerdsController --> DemandPredictor : observes + forecasts
 
-    class DispatchPolicy {
+    class PrepositioningStrategy {
         <<interface>>
-        +choose(SystemSnapshot, Incident) Optional~DispatchDecision~
+        +plan(SystemSnapshot, DemandForecast) RepositionPlan
     }
-    class NearestAvailableUnitPolicy
-    DispatchPolicy <|.. NearestAvailableUnitPolicy
-    NearestAvailableUnitPolicy --> Router : routes
+    class GreedyHotspotPrepositioningStrategy
+    class MultiHotspotPrepositioningStrategy
+    PrepositioningStrategy <|.. GreedyHotspotPrepositioningStrategy
+    PrepositioningStrategy <|.. MultiHotspotPrepositioningStrategy
+    PerdsController --> PrepositioningStrategy : repositions
 
-    class PerdsController
-    PerdsController --> Graph : owns
-    PerdsController --> DispatchEngine : computes
+    class MetricsCollector {
+        <<interface>>
+        +recordDispatchComputation(...)
+        +recordDispatchDecision(...)
+        +recordDispatchCommandApplied(...)
+    }
+    class InMemoryMetricsCollector
+    MetricsCollector <|.. InMemoryMetricsCollector
+    PerdsController --> MetricsCollector : records
 
-    class SystemCommand
-    class SystemSnapshot
-    PerdsController --> SystemCommand : executes
-    PerdsController --> SystemSnapshot : produces
+    class MetricsExporter {
+        <<interface>>
+        +exportTo(Path)
+    }
+    class CsvMetricsExporter
+    MetricsExporter <|.. CsvMetricsExporter
+    Main --> MetricsExporter : exports
 
-    class DispatchCommand
-    class DispatchDecision
-    class Assignment
-    DispatchDecision --> Assignment
-    DefaultDispatchEngine --> DispatchPolicy
-    DefaultDispatchEngine --> DispatchCommand : emits
+    class SyntheticLoadScenarioGenerator
+    Main --> SyntheticLoadScenarioGenerator : generates
+
+    class ScenarioSummary
+    Main --> ScenarioSummary : aggregates
 ```
 
-## Third Class: Dispatch Sequence
+### 2) Per-Event Controller Step (Current)
 
-Source: `third-class-dispatch-sequence.mmd`
+Source: `current-controller-step-sequence.mmd`
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
-    participant Controller as PerdsController
-    participant Graph as AdjacencyMapGraph
-    participant Engine as DefaultDispatchEngine
-    participant Policy as NearestAvailableUnitPolicy
-    participant Router as DijkstraRouter
-
-    User->>Controller: execute(ReportIncidentCommand)
-    Controller->>Engine: compute(snapshot)
-    Engine->>Policy: choose(snapshot, incident)
-    Policy->>Router: findRoute(graph, unitNode, incidentNode)
-    Router->>Graph: outgoingEdges(...) / getEdge(...)
-    Router-->>Policy: Route
-    Policy-->>Engine: DispatchDecision(Assignment, Rationale)
-    Engine-->>Controller: AssignUnitCommand(...)
-    Controller->>Controller: applyAssignment(...)
-    Controller-->>User: assignment stored + unit EN_ROUTE
-```
-
-## Upper Second (2:1): Route Invalidation on Edge Closure
-
-Source: `upper-second-route-invalidation-sequence.mmd`
-
-```mermaid
-sequenceDiagram
     participant Sim as SimulationEngine
     participant Ctrl as PerdsController
     participant G as Graph
-    participant D as DispatchEngine
-    participant M as MetricsCollector
+    participant Index as AssignmentRouteIndex
+    participant Pred as DemandPredictor
+    participant Pre as PrepositioningStrategy
+    participant Eng as DispatchEngine
+    participant Metrics as MetricsCollector
 
-    Sim->>Ctrl: execute(UpdateEdgeCommand, t)
-    Ctrl->>G: updateEdge(from,to,...)
-    Ctrl->>Ctrl: cancel assignments using (from->to)
-    Ctrl->>M: recordDispatchCommandApplied(CANCEL_ASSIGNMENT)
-    Ctrl->>D: compute(snapshot)
-    D-->>Ctrl: [AssignUnitCommand...]
-    Ctrl->>Ctrl: applyAssignment(...)
-    Ctrl->>M: recordDispatchDecision(...)
-    Ctrl->>M: recordDispatchCommandApplied(ASSIGN_UNIT)
+    Sim->>Ctrl: execute(SystemCommand, at)
+
+    alt ReportIncidentCommand
+        Ctrl->>Ctrl: incidents.put(incident)
+        Ctrl->>Pred: observe(incident)
+    end
+
+    alt UpdateEdgeCommand / RemoveEdgeCommand
+        Ctrl->>G: updateEdge/removeEdge(from,to,...)
+        Ctrl->>Index: incidentIdsUsingEdge(from,to)
+        loop each affected incidentId
+            Ctrl->>Ctrl: rerouteOrCancelAssignment(incidentId)
+            Ctrl->>Metrics: recordDispatchCommandApplied(REROUTE or CANCEL)
+        end
+    end
+
+    alt PrepositionUnitsCommand
+        Ctrl->>Pred: forecast(at, horizon)
+        Ctrl->>Pre: plan(snapshot, forecast)
+        Ctrl->>Ctrl: move available units
+    end
+
+    Ctrl->>Eng: compute(snapshot)
+    Ctrl->>Metrics: recordDispatchComputation(...)
+    loop each DispatchCommand
+        Ctrl->>Ctrl: applyDispatchCommand(...)
+        Ctrl->>Metrics: recordDispatchCommandApplied(...)
+    end
 ```
 
-## Lower First: Reroute on Congestion / Edge Update
+### 3) Edge Update: Targeted Reroute / Cancel (Current)
 
-Source: `lower-first-reroute-sequence.mmd`
+Source: `current-edge-update-reroute-sequence.mmd`
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant Scenario
-    participant Controller as PerdsController
-    participant Graph
-    participant Router
-    participant Dispatch as DispatchEngine
+    participant Ctrl as PerdsController
+    participant G as Graph
+    participant Index as AssignmentRouteIndex
+    participant Router as DijkstraRouter
+    participant Metrics as MetricsCollector
 
-    Scenario->>Controller: UPDATE_EDGE(from,to,weights,status)
-    Controller->>Graph: updateEdge(from,to,...)
-    Controller->>Controller: find assignments using edge
+    Scenario->>Ctrl: execute(UpdateEdgeCommand/RemoveEdgeCommand, at)
+    Ctrl->>G: updateEdge/removeEdge(from,to,...)
+    Ctrl->>Index: incidentIdsUsingEdge(from,to)
 
-    alt route exists
-        Controller->>Router: findRoute(unitNode, incidentNode)
-        Router-->>Controller: Route
-        Controller->>Controller: apply REROUTE_UNIT(unitId, route)
-    else unreachable
-        Controller->>Controller: apply CANCEL_ASSIGNMENT(incidentId)
+    loop each affected incidentId
+        Ctrl->>Router: findRoute(unitNode, incidentNode)
+        alt route exists
+            Router-->>Ctrl: Route
+            Ctrl->>Ctrl: apply REROUTE_UNIT(unitId, route)
+            Ctrl->>Metrics: recordDispatchCommandApplied(REROUTE_UNIT)
+        else unreachable
+            Router-->>Ctrl: empty
+            Ctrl->>Ctrl: apply CANCEL_ASSIGNMENT(incidentId)
+            Ctrl->>Metrics: recordDispatchCommandApplied(CANCEL_ASSIGNMENT)
+        end
     end
-
-    Controller->>Dispatch: compute(snapshot)
-    Dispatch-->>Controller: dispatch commands
-    Controller->>Controller: apply commands
 ```
 
-## Lower First: Pre-positioning Sequence
+### 4) Pre-positioning (Current)
 
 Source: `lower-first-prepositioning-sequence.mmd`
 
@@ -196,7 +279,7 @@ sequenceDiagram
     Controller->>Controller: move available units
 ```
 
-## First Class (80-100): Synthetic Evaluation Sequence
+### 5) Synthetic Evaluation Runner (Current)
 
 Source: `first-class-evaluation-sequence.mmd`
 
@@ -223,3 +306,14 @@ sequenceDiagram
     CLI->>Export: exportTo(outDir/runs/<variant>/run-*)
     CLI->>CLI: write evaluation_summary.csv + evaluation_aggregate.md
 ```
+
+## Legacy Diagrams (Reference Only, Not Rendered)
+
+These are kept as a historical trail (what you built on), but they are **not embedded** here:
+
+- `third-class-class-diagram.mmd` (baseline)
+- `third-class-dispatch-sequence.mmd` (baseline)
+- `upper-second-route-invalidation-sequence.mmd` (older 2:1 snapshot)
+- `lower-first-reroute-sequence.mmd` (older reroute snapshot)
+
+If you ever want to render a legacy diagram, copy its contents into a ` ```mermaid` block in a Markdown file or paste into https://mermaid.live.

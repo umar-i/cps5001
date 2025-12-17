@@ -4,6 +4,7 @@ Keep documentation in `docs/` so it can be incorporated into the final report.
 
 Suggested structure:
 - `docs/architecture.md` - system architecture and interfaces.
+- `docs/report.md` - final technical report (Markdown submission).
 - `docs/third-class.md` - Third Class summary (implemented baseline).
 - `docs/lower-second.md` - 2:2 summary (implemented).
 - `docs/upper-second.md` - 2:1 summary (implemented).
@@ -16,6 +17,7 @@ Suggested structure:
 - `docs/diagrams/` - class diagrams and sequence diagrams (text formats preferred).
 - `docs/evaluation.md` - empirical testing plan and results.
 - `docs/ethics.md` - ethical considerations and reflection.
+- `docs/results/` - small, report-ready evaluation outputs (tables/CSVs).
 
 Other top-level folders:
 - `.github/` - GitHub templates and CI workflows (PR template, issue templates, Actions).

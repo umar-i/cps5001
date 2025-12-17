@@ -45,6 +45,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 
 ## Documentation
 
+- Submission report (Markdown): `docs/report.md`
 - Baseline deliverable: `docs/third-class.md`
 - 2:2 deliverable: `docs/lower-second.md`
 - 2:1 deliverable: `docs/upper-second.md`

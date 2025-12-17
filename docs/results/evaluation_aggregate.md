@@ -1,0 +1,14 @@
+# Evaluation Aggregate
+
+Synthetic load config:
+- duration=PT2H
+- unitCount=10
+- incidentCount=50
+- congestionEventCount=48
+- unitOutageCount=2
+
+| variant | runs | etaAvgSecondsMean | etaAvgSecondsP95Runs | waitAvgSecondsMean | waitAvgSecondsP95Runs | computeAvgMicrosMean | cancelCommandsMean | rerouteCommandsMean |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| adaptive_preposition | 10 | 21.66453140246082 | 24.431818181818183 | 307.7158466707499 | 467.5238095238095 | 55.836094674556215 | 0.0 | 16.0 |
+| no_preposition | 10 | 23.4413043015635 | 27.0 | 307.7158466707499 | 467.5238095238095 | 93.38343195266273 | 0.0 | 17.6 |
+| sliding_preposition | 10 | 21.807388545317966 | 24.431818181818183 | 307.7158466707499 | 467.5238095238095 | 62.658579881656806 | 0.0 | 16.3 |

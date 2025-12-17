@@ -29,6 +29,7 @@ import com.neca.perds.system.SystemSnapshot;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,7 @@ public final class PerdsController implements SystemCommandExecutor {
     private final Map<DispatchCentreId, DispatchCentre> dispatchCentres = new HashMap<>();
     private final Map<IncidentId, Incident> incidents = new HashMap<>();
     private final Map<IncidentId, Assignment> assignments = new HashMap<>();
+    private final AssignmentRouteIndex assignmentRouteIndex = new AssignmentRouteIndex();
 
     public PerdsController(
             Graph graph,
@@ -166,6 +168,7 @@ public final class PerdsController implements SystemCommandExecutor {
                 command.incidentId(),
                 assignment
         );
+        assignmentRouteIndex.put(assignment.incidentId(), assignment.route());
 
         units.put(
                 unit.id(),
@@ -216,6 +219,7 @@ public final class PerdsController implements SystemCommandExecutor {
                 assignment.incidentId(),
                 new Assignment(assignment.incidentId(), assignment.unitId(), command.newRoute(), assignment.assignedAt())
         );
+        assignmentRouteIndex.put(assignment.incidentId(), command.newRoute());
     }
 
     private void resolveIncident(IncidentId incidentId, Instant at) {
@@ -236,6 +240,7 @@ public final class PerdsController implements SystemCommandExecutor {
                         Optional.of(at)
                 )
         );
+        assignmentRouteIndex.remove(incidentId);
 
         Assignment assignment = assignments.get(incidentId);
         if (assignment == null) {
@@ -306,28 +311,14 @@ public final class PerdsController implements SystemCommandExecutor {
         if (from == null || to == null) {
             return;
         }
-        if (assignments.isEmpty()) {
-            return;
-        }
 
-        var affectedIncidentIds = assignments.values().stream()
-                .filter(a -> routeUsesEdge(a.route(), from, to))
-                .map(Assignment::incidentId)
+        var affectedIncidentIds = assignmentRouteIndex.incidentIdsUsingEdge(from, to).stream()
+                .sorted(Comparator.comparing(IncidentId::value))
                 .toList();
 
         for (IncidentId incidentId : affectedIncidentIds) {
             rerouteOrCancelAssignment(incidentId, reason, at);
         }
-    }
-
-    private static boolean routeUsesEdge(com.neca.perds.routing.Route route, NodeId from, NodeId to) {
-        var nodes = route.nodes();
-        for (int i = 0; i < nodes.size() - 1; i++) {
-            if (nodes.get(i).equals(from) && nodes.get(i + 1).equals(to)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void rerouteOrCancelAssignment(IncidentId incidentId, String reason, Instant at) {
@@ -382,6 +373,7 @@ public final class PerdsController implements SystemCommandExecutor {
     }
 
     private void cancelAssignment(IncidentId incidentId) {
+        assignmentRouteIndex.remove(incidentId);
         assignments.remove(incidentId);
         Incident incident = incidents.get(incidentId);
         if (incident != null && incident.status() != IncidentStatus.RESOLVED) {

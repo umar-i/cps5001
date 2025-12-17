@@ -30,6 +30,23 @@ Uses a 4x4 grid network to exercise:
 - `mvn -q -DskipTests package`
 - `java -jar target/perds-0.1.0-SNAPSHOT.jar scenario data/scenarios/grid-4x4-nodes.csv data/scenarios/grid-4x4-edges.csv data/scenarios/grid-4x4-events.csv data/out`
 
+### Scenario 4: Synthetic Load Evaluation (First Class)
+
+Runs a repeatable, synthetic load test (hotspot shift + congestion + unit outages) and exports per-run metrics plus aggregate summaries.
+
+- `mvn -q -DskipTests package`
+- `java -jar target/perds-0.1.0-SNAPSHOT.jar evaluate data/scenarios/grid-4x4-nodes.csv data/scenarios/grid-4x4-edges.csv data/out 5 1`
+
+Outputs written under `outDir`:
+- `evaluation_summary.csv` (one row per run + variant)
+- `evaluation_aggregate.csv` and `evaluation_aggregate.md` (aggregate table for report inclusion)
+- `runs/<variant>/run-*/` (raw metrics CSVs per run)
+
+Variants:
+- `no_preposition`: adaptive predictor, no unit moves
+- `sliding_preposition`: sliding-window predictor + multi-hotspot pre-positioning
+- `adaptive_preposition`: adaptive ensemble predictor + multi-hotspot pre-positioning
+
 ## Metrics Exported
 
 The CLI scenario runner writes CSVs to the chosen output directory:

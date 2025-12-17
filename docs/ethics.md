@@ -29,3 +29,14 @@ Even simulated incident data can normalise unsafe data handling practices. A rea
 ## Bias in Historical (or Simulated) Data
 
 Prediction based on historical incidents can encode reporting bias (e.g., over-reporting in monitored areas). A report should discuss data quality, potential biases, and the risk of feedback loops where pre-positioning increases service in already-overserved areas.
+
+## Evaluation-Driven Accountability
+
+The synthetic evaluation runner (`java -jar ... evaluate ...`) produces:
+- per-run aggregate summaries (`evaluation_aggregate.md`)
+- raw per-decision exports (`runs/<variant>/run-*/dispatch_decisions.csv`)
+
+These outputs support ethical auditing in the report:
+- compare `no_preposition` vs `*_preposition` to quantify how proactive moves affect response-time efficiency
+- slice decisions by zone (node/area) to check whether some regions consistently get worse ETA/wait time under hotspot-focused strategies
+- look for instability under disruptions (congestion + unit outages): high reroute/cancel rates can indicate brittle behaviour

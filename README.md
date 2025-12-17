@@ -4,8 +4,8 @@ Java SE 21+ coursework project that simulates an emergency-response dispatch net
 
 ## Status
 
-- Current milestone: **Lower First deliverable implemented** (`docs/lower-first.md`).
-- Next milestone: **First-Class (80-100) enhancements** (adaptive prediction + deeper evaluation/visualisation + report polish).
+- Current milestone: **First-Class (80-100) deliverable implemented** (`docs/first-class.md`).
+- Next milestone: report polish + submission packaging.
 
 ## What's Implemented
 
@@ -49,6 +49,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 - 2:2 deliverable: `docs/lower-second.md`
 - 2:1 deliverable: `docs/upper-second.md`
 - Lower First deliverable: `docs/lower-first.md`
+- First-Class deliverable: `docs/first-class.md`
 - Target architecture / APIs: `docs/architecture.md`
 - Evaluation plan: `docs/evaluation.md`
 - Ethics reflection notes: `docs/ethics.md`
@@ -60,7 +61,7 @@ If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0"
 - [x] 2:2 (50-59): CSV scenario/network loading; basic reallocation; initial metrics exports; partial prediction + one pre-position action
 - [x] 2:1 (60-69): efficient nearest-unit allocation; route invalidation on edge closure; expanded evaluation notes + diagrams
 - [x] Lower First (70-79): predictive demand + multi-hotspot pre-positioning; rerouting on congestion; larger-scale scenario + summary metrics
-- [ ] First (80-100): adaptive prediction + deeper evaluation/visualisation + report polish
+- [x] First (80-100): adaptive prediction + synthetic load evaluation + aggregate visualisation outputs
 
 ## Constraints (Assessment)
 

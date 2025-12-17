@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant CLI as CLI (Main evaluate)
+    participant Gen as SyntheticLoadScenarioGenerator
+    participant Engine as SimulationEngine
+    participant Ctrl as PerdsController
+    participant Pred as DemandPredictor
+    participant Pre as PrepositioningStrategy
+    participant Metrics as InMemoryMetricsCollector
+    participant Export as CsvMetricsExporter
+
+    CLI->>Gen: generate(graph, start, config, seed)
+    CLI->>Engine: scheduleAll(events)
+    loop Each timed event
+        Engine->>Ctrl: execute(command, time)
+        Ctrl->>Pred: observe(incident) (report)
+        Ctrl->>Pred: forecast(at, horizon) (preposition)
+        Ctrl->>Pre: plan(snapshot, forecast)
+        Ctrl->>Metrics: record computation/decisions/commands
+    end
+    CLI->>Export: exportTo(outDir/runs/<variant>/run-*)
+    CLI->>CLI: write evaluation_summary.csv + evaluation_aggregate.md
+

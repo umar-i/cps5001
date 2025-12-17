@@ -12,6 +12,7 @@ import com.neca.perds.io.CsvGraphLoader;
 import com.neca.perds.io.CsvScenarioLoader;
 import com.neca.perds.metrics.CsvMetricsExporter;
 import com.neca.perds.metrics.InMemoryMetricsCollector;
+import com.neca.perds.metrics.ScenarioSummary;
 import com.neca.perds.model.Incident;
 import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.IncidentSeverity;
@@ -24,19 +25,29 @@ import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
 import com.neca.perds.model.UnitStatus;
 import com.neca.perds.model.UnitType;
+import com.neca.perds.prediction.AdaptiveEnsembleDemandPredictor;
 import com.neca.perds.prediction.MultiHotspotPrepositioningStrategy;
+import com.neca.perds.prediction.NoOpPrepositioningStrategy;
 import com.neca.perds.prediction.SlidingWindowDemandPredictor;
 import com.neca.perds.sim.SimulationEngine;
 import com.neca.perds.sim.SystemCommand;
+import com.neca.perds.sim.SyntheticLoadConfig;
+import com.neca.perds.sim.SyntheticLoadScenarioGenerator;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
+import java.util.function.Supplier;
 
 public final class Main {
     private Main() {}
@@ -48,6 +59,10 @@ public final class Main {
         }
         if (args[0].equalsIgnoreCase("scenario")) {
             runScenario(args);
+            return;
+        }
+        if (args[0].equalsIgnoreCase("evaluate")) {
+            runEvaluation(args);
             return;
         }
         if (args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("--help") || args[0].equalsIgnoreCase("-h")) {
@@ -63,6 +78,7 @@ public final class Main {
         System.out.println("Usage:");
         System.out.println("  mvn -q -DskipTests package && java -jar target/perds-0.1.0-SNAPSHOT.jar demo");
         System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar scenario <nodes.csv> <edges.csv> <events.csv> [outDir]");
+        System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar evaluate <nodes.csv> <edges.csv> <outDir> [runs] [seed]");
     }
 
     private static void runDemo() {
@@ -81,7 +97,7 @@ public final class Main {
         var controller = new PerdsController(
                 graph,
                 dispatchEngine,
-                new SlidingWindowDemandPredictor(),
+                new AdaptiveEnsembleDemandPredictor(),
                 new MultiHotspotPrepositioningStrategy(),
                 new InMemoryMetricsCollector()
         );
@@ -156,7 +172,7 @@ public final class Main {
 
         try {
             var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
-            var demandPredictor = new SlidingWindowDemandPredictor();
+            var demandPredictor = new AdaptiveEnsembleDemandPredictor();
             var prepositioning = new MultiHotspotPrepositioningStrategy();
             var controller = new PerdsController(graph, dispatchEngine, demandPredictor, prepositioning, metrics);
 
@@ -186,6 +202,325 @@ public final class Main {
         } catch (RuntimeException e) {
             System.err.println("Error: " + e.getMessage());
         }
+    }
+
+    private record EvaluationVariant(
+            String name,
+            Supplier<com.neca.perds.prediction.DemandPredictor> predictorFactory,
+            Supplier<com.neca.perds.prediction.PrepositioningStrategy> prepositioningFactory
+    ) {
+        private EvaluationVariant {
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("name must not be blank");
+            }
+            if (predictorFactory == null) {
+                throw new IllegalArgumentException("predictorFactory must not be null");
+            }
+            if (prepositioningFactory == null) {
+                throw new IllegalArgumentException("prepositioningFactory must not be null");
+            }
+        }
+    }
+
+    private record EvaluationRow(
+            int run,
+            long seed,
+            String variant,
+            ScenarioSummary summary,
+            String predictorWeights
+    ) {
+        private EvaluationRow {
+            if (run <= 0) {
+                throw new IllegalArgumentException("run must be >= 1");
+            }
+            if (variant == null || variant.isBlank()) {
+                throw new IllegalArgumentException("variant must not be blank");
+            }
+            if (summary == null) {
+                throw new IllegalArgumentException("summary must not be null");
+            }
+        }
+    }
+
+    private static void runEvaluation(String[] args) {
+        if (args.length < 4) {
+            printUsage();
+            return;
+        }
+
+        Path nodesCsv = Path.of(args[1]);
+        Path edgesCsv = Path.of(args[2]);
+        Path outDir = Path.of(args[3]);
+
+        int runs = args.length >= 5 ? Integer.parseInt(args[4]) : 10;
+        long seed = args.length >= 6 ? Long.parseLong(args[5]) : 1L;
+        if (runs <= 0) {
+            System.err.println("runs must be > 0");
+            return;
+        }
+
+        List<EvaluationVariant> variants = List.of(
+                new EvaluationVariant("no_preposition", AdaptiveEnsembleDemandPredictor::new, NoOpPrepositioningStrategy::new),
+                new EvaluationVariant("sliding_preposition", SlidingWindowDemandPredictor::new, MultiHotspotPrepositioningStrategy::new),
+                new EvaluationVariant("adaptive_preposition", AdaptiveEnsembleDemandPredictor::new, MultiHotspotPrepositioningStrategy::new)
+        );
+
+        try {
+            Files.createDirectories(outDir);
+
+            var sizingGraph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
+            SyntheticLoadConfig config = defaultLoadConfig(sizingGraph.nodeIds().size());
+            Instant start = Instant.parse("2025-01-01T00:00:00Z");
+
+            var generator = new SyntheticLoadScenarioGenerator();
+            List<EvaluationRow> rows = new ArrayList<>();
+            for (int run = 1; run <= runs; run++) {
+                long runSeed = seed + (run - 1L);
+                for (EvaluationVariant variant : variants) {
+                    rows.add(runOneEvaluation(nodesCsv, edgesCsv, outDir, generator, config, start, run, runSeed, variant));
+                }
+            }
+
+            writeEvaluationFiles(outDir, config, rows);
+            System.out.println("Wrote evaluation output to: " + outDir.toAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("I/O error: " + e.getMessage());
+        } catch (RuntimeException e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    private static SyntheticLoadConfig defaultLoadConfig(int nodeCount) {
+        int unitCount = Math.min(40, Math.max(10, nodeCount / 4));
+        int incidentCount = unitCount * 5;
+        int congestionEvents = Math.max(20, nodeCount * 3);
+        int unitOutages = Math.max(0, unitCount / 4);
+
+        return new SyntheticLoadConfig(
+                Duration.ofHours(2),
+                unitCount,
+                incidentCount,
+                Duration.ofMinutes(15),
+                Duration.ofMinutes(30),
+                congestionEvents,
+                unitOutages,
+                Duration.ofMinutes(10)
+        );
+    }
+
+    private static EvaluationRow runOneEvaluation(
+            Path nodesCsv,
+            Path edgesCsv,
+            Path outDir,
+            SyntheticLoadScenarioGenerator generator,
+            SyntheticLoadConfig config,
+            Instant start,
+            int run,
+            long seed,
+            EvaluationVariant variant
+    ) throws IOException {
+        var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
+        var dispatchEngine = new DefaultDispatchEngine(
+                new SeverityThenOldestPrioritizer(),
+                new MultiSourceNearestAvailableUnitPolicy()
+        );
+
+        var metrics = new InMemoryMetricsCollector();
+        var predictor = variant.predictorFactory().get();
+        var prepositioning = variant.prepositioningFactory().get();
+        var controller = new PerdsController(graph, dispatchEngine, predictor, prepositioning, metrics);
+
+        var events = generator.generate(graph, start, config, seed);
+        var engine = new SimulationEngine();
+        engine.scheduleAll(events);
+
+        Instant untilExclusive = events.isEmpty() ? start : events.getLast().time().plusMillis(1);
+        var executed = engine.runUntil(controller, untilExclusive);
+
+        new CsvMetricsExporter(metrics).exportTo(outDir.resolve("runs").resolve(variant.name()).resolve("run-" + run));
+
+        var snapshot = controller.snapshot(untilExclusive);
+        ScenarioSummary summary = ScenarioSummary.from(snapshot, metrics);
+
+        String weights = predictor instanceof AdaptiveEnsembleDemandPredictor adaptive
+                ? flattenWeights(adaptive.weights())
+                : "";
+
+        long prepositionCommands = executed.stream().filter(e -> e.command() instanceof SystemCommand.PrepositionUnitsCommand).count();
+        if (prepositionCommands > 0 && prepositioning instanceof NoOpPrepositioningStrategy) {
+            weights = weights.isBlank() ? "preposition=no-op" : weights + "|preposition=no-op";
+        }
+
+        return new EvaluationRow(run, seed, variant.name(), summary, weights);
+    }
+
+    private static void writeEvaluationFiles(Path outDir, SyntheticLoadConfig config, List<EvaluationRow> rows) throws IOException {
+        Path summaryCsv = outDir.resolve("evaluation_summary.csv");
+        Path aggregateCsv = outDir.resolve("evaluation_aggregate.csv");
+        Path aggregateMd = outDir.resolve("evaluation_aggregate.md");
+
+        try (var writer = Files.newBufferedWriter(summaryCsv)) {
+            writer.write("run,seed,variant,incidentsTotal,incidentsResolved,incidentsQueued,unitsTotal,decisions,assignCommands,rerouteCommands,cancelCommands,computeAvgMicros,computeP95Micros,computeMaxMicros,etaAvgSeconds,etaP95Seconds,waitAvgSeconds,waitP95Seconds,predictorWeights");
+            writer.newLine();
+            for (EvaluationRow row : rows) {
+                ScenarioSummary s = row.summary();
+                writer.write(csvRow(
+                        String.valueOf(row.run()),
+                        String.valueOf(row.seed()),
+                        row.variant(),
+                        String.valueOf(s.incidentsTotal()),
+                        String.valueOf(s.incidentsResolved()),
+                        String.valueOf(s.incidentsQueued()),
+                        String.valueOf(s.unitsTotal()),
+                        String.valueOf(s.decisions()),
+                        String.valueOf(s.assignCommands()),
+                        String.valueOf(s.rerouteCommands()),
+                        String.valueOf(s.cancelCommands()),
+                        String.valueOf(s.computeAvgMicros()),
+                        String.valueOf(s.computeP95Micros()),
+                        String.valueOf(s.computeMaxMicros()),
+                        String.valueOf(s.etaAvgSeconds()),
+                        String.valueOf(s.etaP95Seconds()),
+                        String.valueOf(s.waitAvgSeconds()),
+                        String.valueOf(s.waitP95Seconds()),
+                        row.predictorWeights()
+                ));
+                writer.newLine();
+            }
+        }
+
+        Map<String, List<EvaluationRow>> byVariant = new HashMap<>();
+        for (EvaluationRow row : rows) {
+            byVariant.computeIfAbsent(row.variant(), ignored -> new ArrayList<>()).add(row);
+        }
+
+        try (var writer = Files.newBufferedWriter(aggregateCsv)) {
+            writer.write("variant,runs,etaAvgSecondsMean,etaAvgSecondsP95Runs,waitAvgSecondsMean,waitAvgSecondsP95Runs,computeAvgMicrosMean,cancelCommandsMean,rerouteCommandsMean");
+            writer.newLine();
+
+            for (var entry : byVariant.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
+                String variant = entry.getKey();
+                List<EvaluationRow> variantRows = entry.getValue();
+
+                List<Double> etaAvg = variantRows.stream().map(r -> r.summary().etaAvgSeconds()).toList();
+                List<Double> waitAvg = variantRows.stream().map(r -> r.summary().waitAvgSeconds()).toList();
+                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMicros()).toList();
+                List<Double> cancels = variantRows.stream().map(r -> (double) r.summary().cancelCommands()).toList();
+                List<Double> reroutes = variantRows.stream().map(r -> (double) r.summary().rerouteCommands()).toList();
+
+                writer.write(csvRow(
+                        variant,
+                        String.valueOf(variantRows.size()),
+                        String.valueOf(mean(etaAvg)),
+                        String.valueOf(p95(etaAvg)),
+                        String.valueOf(mean(waitAvg)),
+                        String.valueOf(p95(waitAvg)),
+                        String.valueOf(mean(computeAvg)),
+                        String.valueOf(mean(cancels)),
+                        String.valueOf(mean(reroutes))
+                ));
+                writer.newLine();
+            }
+        }
+
+        try (var writer = Files.newBufferedWriter(aggregateMd)) {
+            writer.write("# Evaluation Aggregate");
+            writer.newLine();
+            writer.newLine();
+            writer.write("Synthetic load config:");
+            writer.newLine();
+            writer.write("- duration=" + config.duration());
+            writer.newLine();
+            writer.write("- unitCount=" + config.unitCount());
+            writer.newLine();
+            writer.write("- incidentCount=" + config.incidentCount());
+            writer.newLine();
+            writer.write("- congestionEventCount=" + config.congestionEventCount());
+            writer.newLine();
+            writer.write("- unitOutageCount=" + config.unitOutageCount());
+            writer.newLine();
+            writer.newLine();
+
+            writer.write("| variant | runs | etaAvgSecondsMean | etaAvgSecondsP95Runs | waitAvgSecondsMean | waitAvgSecondsP95Runs | computeAvgMicrosMean | cancelCommandsMean | rerouteCommandsMean |");
+            writer.newLine();
+            writer.write("|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+            writer.newLine();
+
+            for (var entry : byVariant.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
+                String variant = entry.getKey();
+                List<EvaluationRow> variantRows = entry.getValue();
+
+                List<Double> etaAvg = variantRows.stream().map(r -> r.summary().etaAvgSeconds()).toList();
+                List<Double> waitAvg = variantRows.stream().map(r -> r.summary().waitAvgSeconds()).toList();
+                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMicros()).toList();
+                List<Double> cancels = variantRows.stream().map(r -> (double) r.summary().cancelCommands()).toList();
+                List<Double> reroutes = variantRows.stream().map(r -> (double) r.summary().rerouteCommands()).toList();
+
+                writer.write("| " + variant
+                        + " | " + variantRows.size()
+                        + " | " + mean(etaAvg)
+                        + " | " + p95(etaAvg)
+                        + " | " + mean(waitAvg)
+                        + " | " + p95(waitAvg)
+                        + " | " + mean(computeAvg)
+                        + " | " + mean(cancels)
+                        + " | " + mean(reroutes)
+                        + " |");
+                writer.newLine();
+            }
+        }
+    }
+
+    private static double mean(List<Double> values) {
+        if (values.isEmpty()) {
+            return 0.0;
+        }
+        double sum = 0.0;
+        for (double value : values) {
+            sum += value;
+        }
+        return sum / values.size();
+    }
+
+    private static double p95(List<Double> values) {
+        if (values.isEmpty()) {
+            return 0.0;
+        }
+        List<Double> sorted = new ArrayList<>(values);
+        sorted.sort(Comparator.naturalOrder());
+        int index = (int) Math.ceil(0.95 * sorted.size()) - 1;
+        index = Math.max(0, Math.min(index, sorted.size() - 1));
+        return sorted.get(index);
+    }
+
+    private static String flattenWeights(Map<String, Double> weights) {
+        if (weights.isEmpty()) {
+            return "";
+        }
+        StringJoiner joiner = new StringJoiner("|");
+        for (var entry : weights.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
+            joiner.add(entry.getKey() + "=" + entry.getValue());
+        }
+        return joiner.toString();
+    }
+
+    private static String csvRow(String... fields) {
+        StringJoiner joiner = new StringJoiner(",");
+        for (String field : fields) {
+            joiner.add(escapeCsvField(field));
+        }
+        return joiner.toString();
+    }
+
+    private static String escapeCsvField(String field) {
+        if (field == null) {
+            return "";
+        }
+        boolean needsQuotes = field.contains(",") || field.contains("\"") || field.contains("\n") || field.contains("\r");
+        if (!needsQuotes) {
+            return field;
+        }
+        return "\"" + field.replace("\"", "\"\"") + "\"";
     }
 
     private static void printSummary(com.neca.perds.system.SystemSnapshot snapshot, InMemoryMetricsCollector metrics, java.util.List<com.neca.perds.sim.TimedEvent> executed) {

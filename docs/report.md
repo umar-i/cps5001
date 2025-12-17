@@ -97,7 +97,7 @@ Weights and closures:
 
 - `EdgeWeights` holds `distanceKm`, `travelTime` (a `Duration`), and a `resourceAvailability` factor in `[0,1]`.
 - `EdgeStatus` is `OPEN` / `CLOSED`.
-- Routing cost functions treat `CLOSED` edges as unreachable by returning `+∞` (see `com.neca.perds.routing.CostFunctions`).
+- Routing cost functions treat `CLOSED` edges as unreachable by returning `+Infinity` (see `com.neca.perds.routing.CostFunctions`).
 
 ### 2.2 Routing (Dijkstra + A*)
 
@@ -112,10 +112,10 @@ I didn’t pick something exotic here. Dijkstra is predictable, and it fits the 
 
 Rather than baking “travel time” into the routing code, I used `EdgeCostFunction` so the router stays generic. Two cost functions are provided in `CostFunctions`:
 
-- `travelTimeSeconds()` → `edge.weights().travelTime().toSeconds()` for `OPEN` edges, otherwise `+∞`
-- `distanceKm()` → `edge.weights().distanceKm()` for `OPEN` edges, otherwise `+∞`
+- `travelTimeSeconds()` -> `edge.weights().travelTime().toSeconds()` for `OPEN` edges, otherwise `+Infinity`
+- `distanceKm()` -> `edge.weights().distanceKm()` for `OPEN` edges, otherwise `+Infinity`
 
-That `+∞` trick is how closures work during routing: closed edges still exist in the graph (so you can reopen them), but they become unreachable for shortest-path.
+That `+Infinity` trick is how closures work during routing: closed edges still exist in the graph (so you can reopen them), but they become unreachable for shortest-path.
 
 **Why a custom priority queue**
 
@@ -142,7 +142,7 @@ That lets me avoid creating a ton of wrapper objects during routing. It also mak
 
 **A* (optional optimisation)**
 
-`AStarRouter` is the same idea, except the priority in the open set is `fScore = gScore + heuristic(start → goal)`. The heuristic interface is `Heuristic.estimate(graph, from, goal)`.
+`AStarRouter` is the same idea, except the priority in the open set is `fScore = gScore + heuristic(start -> goal)`. The heuristic interface is `Heuristic.estimate(graph, from, goal)`.
 
 In this coursework, most scenarios don’t need A* because there aren’t coordinates everywhere (nodes can have no `GeoPoint`). But I kept it because it’s a clean extension point: if you do have coordinates, `EuclideanHeuristic` is ready to go.
 
@@ -216,13 +216,13 @@ So the next dispatch cycle can pick a different unit.
 The graph supports two “bad things happen” cases:
 
 - `RemoveEdge` (road closure)
-- `UpdateEdge` (congestion → travel time changes, or closure via status)
+- `UpdateEdge` (congestion -> travel time changes, or closure via status)
 
 When an edge changes, I don’t want to scan every assignment route on every update. That gets ugly fast. So for the First-Class work I added `AssignmentRouteIndex`:
 
 - On every assignment / reroute, I index the unique edges in that `Route`.
 - On cancellation or resolution, I remove the incident from the index.
-- When an edge changes, I can ask: “which incidents currently have a route that uses `(from → to)`?”
+- When an edge changes, I can ask: “which incidents currently have a route that uses `(from -> to)`?”
 
 That’s exactly what `PerdsController.rerouteOrCancelAssignmentsUsingEdge(...)` does. For each affected assignment, the controller tries to recompute a route from the unit’s *current node* to the incident:
 
@@ -324,19 +324,66 @@ I treated version control as part of the deliverable, not an afterthought. The r
 
 That matters because it shows incremental development and makes it easier to review changes. It also helped me personally: when I broke routing during the multi-source work, I could bisect quickly instead of guessing.
 
+### 2.9 Ethical considerations (fairness, transparency, robustness)
+
+I’m aware this is “just a simulation”, but the same shortcuts and incentives show up in real dispatch systems too.
+
+Fairness vs efficiency is the obvious tension. Nearest-first dispatch and hotspot pre-positioning usually improve the *average* ETA, but you can also end up pulling units out of low-demand areas until those areas effectively become “always second priority”. I didn’t implement hard fairness constraints (coverage minimums, penalties for stripping a zone, etc.), but I tried to make the trade-off visible rather than hiding it.
+
+Two concrete things in the system help with that:
+
+- Decisions are explainable: every assignment stores a `DispatchRationale` with components (travel time, distance, severity). Those components are exported in `dispatch_decisions.csv` so you can audit what happened instead of guessing.
+- Evaluation outputs are comparable: the synthetic runner exports the same metrics across variants so you can compare `no_preposition` vs `*_preposition` and check whether faster ETAs come with instability (reroutes/cancels) or worse tails (p95).
+
+Robustness is the other big one. A routing/dispatch system that only works when roads never change is basically useless. That’s why I built the reroute/cancel path and later optimised it with `AssignmentRouteIndex` rather than relying on “full recompute is probably fine”.
+
 ## 3 Recommendations
 
-TODO
+If I kept working on this after submission, I’d focus on a few things that are “boring” but would make the simulation closer to reality:
+
+- **Continuous movement**: right now a unit is basically “at a node” until an event moves it. A better model would schedule movement along edges over time and then rerun dispatch at meaningful points (arrival, traffic update, new incident). That would also make rerouting feel less like teleporting.
+- **Fairness constraints**: I can already measure outcomes by zone, but I don’t enforce anything. The next step would be adding minimum coverage rules (e.g., keep at least 1 unit per region) or adding a fairness penalty into `DispatchRationale` so hotspot chasing doesn’t become the only objective.
+- **More realistic resource constraints**: `EdgeWeights.resourceAvailability` exists but I don’t use it in routing/dispatch yet. In a real system, you’d want to factor in things like road suitability, station capacity, and “don’t send the last ambulance out of a whole district”.
+- **Route caching with invalidation**: the graph versioning and the targeted edge index are already there. It would be possible to cache common routes and invalidate only what’s affected on updates (carefully, because caching can also make behaviour stale if you’re not disciplined).
+- **Lightweight plotting**: I kept visualisation to Markdown tables/CSVs because of the dependency constraints, but a small script (even just spreadsheet guidance) to plot ETA distributions per variant would make the evaluation section clearer.
 
 ## 4 References
 
-TODO
+I didn’t rely on external libraries for algorithms, but I did lean on standard sources for the ideas:
+
+- CPS5001 Assessment 2 brief (project requirements; local copy in `requirements.txt`)
+- Java SE 21 API documentation (records, collections, `Duration`, etc.)
+- E. W. Dijkstra (1959). *A note on two problems in connexion with graphs.*
+- P. E. Hart, N. J. Nilsson, B. Raphael (1968). *A Formal Basis for the Heuristic Determination of Minimum Cost Paths.*
 
 ## 5 Appendices
 
 ### Appendix A: How to run (commands)
 
-TODO
+Prereqs: Java 21+, Maven 3.9+.
+
+Run unit tests:
+
+- `mvn test`
+- If your environment blocks forked test JVMs: `mvn "-Dperds.surefire.forkCount=0" test`
+
+Build a runnable JAR:
+
+- `mvn -q -DskipTests package`
+
+Run the tiny demo:
+
+- `java -jar target/perds-0.1.0-SNAPSHOT.jar demo`
+
+Run a CSV scenario (and optionally export metrics):
+
+- `java -jar target/perds-0.1.0-SNAPSHOT.jar scenario data/scenarios/mini-nodes.csv data/scenarios/mini-edges.csv data/scenarios/mini-events.csv data/out`
+
+Run the synthetic evaluation:
+
+- `java -jar target/perds-0.1.0-SNAPSHOT.jar evaluate data/scenarios/grid-4x4-nodes.csv data/scenarios/grid-4x4-edges.csv data/out/eval-report 10 1`
+
+More scenario ideas (reallocation, edge closures, congestion spikes) are listed in `docs/evaluation.md`.
 
 ### Appendix B: Complexity summary (high-level)
 
@@ -349,6 +396,7 @@ Notation used below:
 - `A` active assignments, `L` average route length (nodes)
 - `K` assignments affected by an updated edge
 - `Z` zones with history, `M` predictor models
+- `N` incident timestamps stored for a zone (worst-case)
 
 | Area | Operation | Time (typical) | Notes |
 |---|---|---:|---|
@@ -357,8 +405,8 @@ Notation used below:
 | Routing (`DijkstraRouter` / `AStarRouter`) | one shortest-path query | `O((V + E) log V)` | binary heap PQ; arrays for dist/prev |
 | Dispatch (baseline) | per incident, `NearestAvailableUnitPolicy` | `O(U * (V + E) log V)` | routes once per eligible unit |
 | Dispatch (improved) | per incident, `MultiSourceNearestAvailableUnitPolicy` | `O((V + E + S) log V)` | `S` = distinct unit start nodes (virtual edges) |
-| Dynamic updates | edge update → find affected assignments | `O(1)` + `O(K)` | `AssignmentRouteIndex` lookup + iterate affected IDs |
-| Dynamic updates | edge update → reroute affected assignments | `O(K * (V + E) log V)` | one reroute query per affected assignment |
+| Dynamic updates | edge update -> find affected assignments | `O(1)` + `O(K)` | `AssignmentRouteIndex` lookup + iterate affected IDs |
+| Dynamic updates | edge update -> reroute affected assignments | `O(K * (V + E) log V)` | one reroute query per affected assignment |
 | Sliding window predictor | `observe` | `O(1)` amortised | enqueue + prune old timestamps |
 | Sliding window predictor | `forecast` | `O(Z)` | prune per zone + scale counts |
 | Exp smoothing predictor | `observe` | `O(Z)` | decays all zone scores each incident |

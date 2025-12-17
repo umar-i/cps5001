@@ -20,5 +20,5 @@ Goal: reach the **First Class (80-100)** software + report criteria from `requir
 ## Version Control Evidence (GitHub)
 
 - [x] Implement via feature branch + small commits pushed regularly
-- [ ] Open PR, pass CI, squash-merge to `main`, delete branch
-- [ ] Tag milestone: `v1.0.0-first`
+- [x] Open PR, pass CI, squash-merge to `main`, delete branch
+- [x] Tag milestone: `v1.0.0-first`

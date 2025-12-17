@@ -265,7 +265,30 @@ Finally, `PerdsController` applies the move plan when it receives `SystemCommand
 
 ### 2.6 Metrics + evaluation (export + aggregate)
 
-TODO
+I treated metrics as a first-class feature because otherwise the “evaluation” section becomes vibes.
+
+The metrics pipeline is:
+
+1. `PerdsController` records:
+   - dispatch computation time (per event step)
+   - each dispatch decision (assignment + rationale components)
+   - each applied dispatch command (assign / reroute / cancel)
+2. `InMemoryMetricsCollector` stores those records in lists.
+3. `CsvMetricsExporter` exports them to CSV for analysis.
+
+The CSVs are intentionally boring (plain rows, no nested JSON):
+
+- `dispatch_computations.csv`
+- `dispatch_decisions.csv`
+- `dispatch_commands_applied.csv`
+
+That is enough to answer most “did the system behave well?” questions:
+
+- Are we cancelling a lot when roads close?
+- Does pre-positioning reduce ETA, or does it just shuffle units around?
+- Does dispatch compute time blow up when incidents spike?
+
+For quick feedback, I added `ScenarioSummary` which computes a small set of aggregated metrics (avg/p95 compute time, avg/p95 ETA, avg/p95 wait time, plus command counts). The CLI prints this summary after running a scenario, and the First-Class `evaluate` command also writes an aggregate Markdown table that can be pasted straight into the report.
 
 ### 2.7 Testing + reliability
 
@@ -293,7 +316,28 @@ TODO
 
 **Table 2: Complexity summary (high-level)**
 
-TODO
+Notation used below:
+
+- `V` nodes, `E` edges
+- `U` response units, `I` incidents considered in a compute cycle
+- `A` active assignments, `L` average route length (nodes)
+- `K` assignments affected by an updated edge
+- `Z` zones with history, `M` predictor models
+
+| Area | Operation | Time (typical) | Notes |
+|---|---|---:|---|
+| Graph (`AdjacencyMapGraph`) | `addNode`, `putEdge`, `updateEdge`, `removeEdge` | `O(1)` avg | HashMap operations |
+| Graph (`AdjacencyMapGraph`) | `removeNode` | `O(V + E)` worst | removes incoming edges by scanning outgoing maps |
+| Routing (`DijkstraRouter` / `AStarRouter`) | one shortest-path query | `O((V + E) log V)` | binary heap PQ; arrays for dist/prev |
+| Dispatch (baseline) | per incident, `NearestAvailableUnitPolicy` | `O(U * (V + E) log V)` | routes once per eligible unit |
+| Dispatch (improved) | per incident, `MultiSourceNearestAvailableUnitPolicy` | `O((V + E + S) log V)` | `S` = distinct unit start nodes (virtual edges) |
+| Dynamic updates | edge update → find affected assignments | `O(1)` + `O(K)` | `AssignmentRouteIndex` lookup + iterate affected IDs |
+| Dynamic updates | edge update → reroute affected assignments | `O(K * (V + E) log V)` | one reroute query per affected assignment |
+| Sliding window predictor | `observe` | `O(1)` amortised | enqueue + prune old timestamps |
+| Sliding window predictor | `forecast` | `O(Z)` | prune per zone + scale counts |
+| Exp smoothing predictor | `observe` | `O(Z)` | decays all zone scores each incident |
+| Ensemble predictor | `forecast` | `O(M * Z)` | combine model forecasts |
+| Ensemble predictor | weight update (when forecasts mature) | `O(M * Z log N)` | binary-search incident timestamps per zone window |
 
 ### Appendix C: Synthetic evaluation outputs
 

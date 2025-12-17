@@ -1,11 +1,7 @@
 # Diagrams (Rendered On GitHub)
 
-GitHub renders Mermaid diagrams **only** when they are inside a Markdown fence:
-
-```mermaid
-sequenceDiagram
-    A->>B: hello
-```
+GitHub renders Mermaid diagrams **only** when they are inside a Markdown fence (` ```mermaid ... ``` `).
+This page contains multiple diagrams — there are no “slides”; just scroll, or jump using the table of contents below.
 
 This folder keeps two things:
 
@@ -13,6 +9,12 @@ This folder keeps two things:
 - **Legacy diagrams (not rendered)**: older snapshots kept as reference only.
 
 ## Current Diagrams (Latest System)
+
+- 1) System Class Diagram (Current)
+- 2) Per-Event Controller Step (Current)
+- 3) Edge Update: Targeted Reroute / Cancel (Current)
+- 4) Pre-positioning (Current)
+- 5) Synthetic Evaluation Runner (Current)
 
 ### 1) System Class Diagram (Current)
 

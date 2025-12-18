@@ -23,6 +23,7 @@ Prereqs: Java 21+, Maven 3.9+.
 
 - Run tests: `mvn test`
 - Package: `mvn -q -DskipTests package`
+- Verify built-in scenarios (PASS/FAIL): `java -jar target/perds-0.1.0-SNAPSHOT.jar verify`
 - Run demo: `java -jar target/perds-0.1.0-SNAPSHOT.jar demo`
 - Run sample scenario + export metrics: `java -jar target/perds-0.1.0-SNAPSHOT.jar scenario data/scenarios/mini-nodes.csv data/scenarios/mini-edges.csv data/scenarios/mini-events.csv data/out`
 

@@ -3,6 +3,7 @@ package com.neca.perds.cli;
 import com.neca.perds.app.PerdsController;
 import com.neca.perds.dispatch.DefaultDispatchEngine;
 import com.neca.perds.dispatch.MultiSourceNearestAvailableUnitPolicy;
+import com.neca.perds.dispatch.NearestAvailableUnitPolicy;
 import com.neca.perds.dispatch.SeverityThenOldestPrioritizer;
 import com.neca.perds.graph.AdjacencyMapGraph;
 import com.neca.perds.graph.Edge;
@@ -27,6 +28,7 @@ import com.neca.perds.model.UnitStatus;
 import com.neca.perds.model.UnitType;
 import com.neca.perds.prediction.AdaptiveEnsembleDemandPredictor;
 import com.neca.perds.prediction.MultiHotspotPrepositioningStrategy;
+import com.neca.perds.prediction.NoOpDemandPredictor;
 import com.neca.perds.prediction.NoOpPrepositioningStrategy;
 import com.neca.perds.prediction.SlidingWindowDemandPredictor;
 import com.neca.perds.sim.SimulationEngine;
@@ -65,6 +67,10 @@ public final class Main {
             runEvaluation(args);
             return;
         }
+        if (args[0].equalsIgnoreCase("verify")) {
+            runVerify();
+            return;
+        }
         if (args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("--help") || args[0].equalsIgnoreCase("-h")) {
             printUsage();
             return;
@@ -77,6 +83,7 @@ public final class Main {
     private static void printUsage() {
         System.out.println("Usage:");
         System.out.println("  mvn -q -DskipTests package && java -jar target/perds-0.1.0-SNAPSHOT.jar demo");
+        System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar verify");
         System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar scenario <nodes.csv> <edges.csv> <events.csv> [outDir]");
         System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar evaluate <nodes.csv> <edges.csv> <outDir> [runs] [seed]");
     }
@@ -201,6 +208,208 @@ public final class Main {
             System.err.println("I/O error: " + e.getMessage());
         } catch (RuntimeException e) {
             System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    private static void runVerify() {
+        Path startDir = Path.of("").toAbsolutePath().normalize();
+        Path repoRoot = locateRepoRoot(startDir);
+
+        boolean miniOk = true;
+        boolean gridOk = true;
+        List<String> failures = new ArrayList<>();
+
+        try {
+            verifyMiniScenario(repoRoot);
+        } catch (Exception e) {
+            miniOk = false;
+            failures.add("mini: " + e.getMessage());
+        }
+
+        try {
+            verifyGridScenario(repoRoot);
+        } catch (Exception e) {
+            gridOk = false;
+            failures.add("grid: " + e.getMessage());
+        }
+
+        System.out.println("PERDS verify:");
+        System.out.println("  repoRoot: " + repoRoot.toAbsolutePath());
+        System.out.println("  mini: " + (miniOk ? "PASS" : "FAIL"));
+        System.out.println("  grid: " + (gridOk ? "PASS" : "FAIL"));
+
+        if (failures.isEmpty()) {
+            System.out.println("Overall: PASS");
+            System.exit(0);
+        }
+
+        System.out.println("Overall: FAIL");
+        failures.forEach(f -> System.out.println("  - " + f));
+        System.exit(1);
+    }
+
+    private static Path locateRepoRoot(Path startDir) {
+        Path current = startDir.toAbsolutePath().normalize();
+        for (int i = 0; i < 10; i++) {
+            if (Files.isRegularFile(current.resolve("pom.xml")) && Files.isDirectory(current.resolve("src"))) {
+                return current;
+            }
+            if (Files.isDirectory(current.resolve("data").resolve("scenarios"))) {
+                return current;
+            }
+            Path parent = current.getParent();
+            if (parent == null) {
+                return startDir;
+            }
+            current = parent;
+        }
+        return startDir;
+    }
+
+    private static void verifyMiniScenario(Path repoRoot) throws IOException {
+        Path nodesCsv = scenarioPath(repoRoot, "mini-nodes.csv");
+        Path edgesCsv = scenarioPath(repoRoot, "mini-edges.csv");
+        Path eventsCsv = scenarioPath(repoRoot, "mini-events.csv");
+
+        var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
+        List<com.neca.perds.sim.TimedEvent> events = new CsvScenarioLoader().load(eventsCsv);
+
+        var metrics = new InMemoryMetricsCollector();
+        var controller = new PerdsController(
+                graph,
+                new DefaultDispatchEngine(new SeverityThenOldestPrioritizer(), new NearestAvailableUnitPolicy()),
+                new NoOpDemandPredictor(),
+                new NoOpPrepositioningStrategy(),
+                metrics
+        );
+
+        var engine = new SimulationEngine();
+        engine.scheduleAll(events);
+
+        Instant untilExclusive = events.getLast().time().plusSeconds(1);
+        List<com.neca.perds.sim.TimedEvent> executed = engine.runUntil(controller, untilExclusive);
+        require(executed.size() == events.size(), "Expected to execute all events (executed=" + executed.size() + ", expected=" + events.size() + ")");
+
+        var snapshot = controller.snapshot(untilExclusive);
+        ScenarioSummary summary = ScenarioSummary.from(snapshot, metrics);
+
+        require(summary.incidentsTotal() == 2, "Expected incidentsTotal=2 (actual=" + summary.incidentsTotal() + ")");
+        require(summary.incidentsResolved() == 2, "Expected incidentsResolved=2 (actual=" + summary.incidentsResolved() + ")");
+        require(snapshot.assignments().isEmpty(), "Expected no active assignments at end");
+
+        assertReallocated(metrics, new IncidentId("I1"), new UnitId("U2"), new UnitId("U1"));
+        assertAssigned(metrics, new IncidentId("I2"), new UnitId("U1"));
+
+        var u1 = snapshot.units().stream().filter(u -> u.id().equals(new UnitId("U1"))).findFirst()
+                .orElseThrow(() -> new VerifyFailedException("Expected unit U1 to exist"));
+        require(u1.status() == UnitStatus.AVAILABLE, "Expected U1 status AVAILABLE (actual=" + u1.status() + ")");
+        require(u1.assignedIncidentId().isEmpty(), "Expected U1 assignedIncidentId empty");
+
+        var u2 = snapshot.units().stream().filter(u -> u.id().equals(new UnitId("U2"))).findFirst()
+                .orElseThrow(() -> new VerifyFailedException("Expected unit U2 to exist"));
+        require(u2.status() == UnitStatus.UNAVAILABLE, "Expected U2 status UNAVAILABLE (actual=" + u2.status() + ")");
+        require(u2.assignedIncidentId().isEmpty(), "Expected U2 assignedIncidentId empty");
+    }
+
+    private static void verifyGridScenario(Path repoRoot) throws IOException {
+        Path nodesCsv = scenarioPath(repoRoot, "grid-4x4-nodes.csv");
+        Path edgesCsv = scenarioPath(repoRoot, "grid-4x4-edges.csv");
+        Path eventsCsv = scenarioPath(repoRoot, "grid-4x4-events.csv");
+
+        var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
+        List<com.neca.perds.sim.TimedEvent> events = new CsvScenarioLoader().load(eventsCsv);
+
+        var metrics = new InMemoryMetricsCollector();
+        var controller = new PerdsController(
+                graph,
+                new DefaultDispatchEngine(new SeverityThenOldestPrioritizer(), new NearestAvailableUnitPolicy()),
+                new NoOpDemandPredictor(),
+                new NoOpPrepositioningStrategy(),
+                metrics
+        );
+
+        var engine = new SimulationEngine();
+        engine.scheduleAll(events);
+
+        Instant untilExclusive = events.getLast().time().plusSeconds(1);
+        List<com.neca.perds.sim.TimedEvent> executed = engine.runUntil(controller, untilExclusive);
+        require(executed.size() == events.size(), "Expected to execute all events (executed=" + executed.size() + ", expected=" + events.size() + ")");
+
+        var snapshot = controller.snapshot(untilExclusive);
+        ScenarioSummary summary = ScenarioSummary.from(snapshot, metrics);
+
+        require(summary.incidentsTotal() == 6, "Expected incidentsTotal=6 (actual=" + summary.incidentsTotal() + ")");
+        require(summary.incidentsResolved() == 6, "Expected incidentsResolved=6 (actual=" + summary.incidentsResolved() + ")");
+        require(snapshot.assignments().isEmpty(), "Expected no active assignments at end");
+
+        Optional<InMemoryMetricsCollector.DispatchCommandAppliedRecord> rerouteRecord = metrics.commandsApplied().stream()
+                .filter(r -> r.command() instanceof com.neca.perds.dispatch.DispatchCommand.RerouteUnitCommand)
+                .findFirst();
+        require(rerouteRecord.isPresent(), "Expected at least one reroute after UPDATE_EDGE");
+
+        Instant expectedRerouteTime = Instant.parse("2025-01-01T00:02:00Z");
+        require(expectedRerouteTime.equals(rerouteRecord.get().at()),
+                "Expected reroute time " + expectedRerouteTime + " (actual=" + rerouteRecord.get().at() + ")");
+
+        com.neca.perds.dispatch.DispatchCommand.RerouteUnitCommand reroute =
+                (com.neca.perds.dispatch.DispatchCommand.RerouteUnitCommand) rerouteRecord.get().command();
+        require(!routeContainsEdge(reroute.newRoute().nodes(), "N01", "N02"),
+                "Rerouted path should avoid congested edge N01->N02");
+    }
+
+    private static Path scenarioPath(Path repoRoot, String fileName) {
+        Path path = repoRoot.resolve("data").resolve("scenarios").resolve(fileName);
+        if (!Files.isRegularFile(path)) {
+            throw new VerifyFailedException("Missing dataset file: " + path.toAbsolutePath());
+        }
+        return path;
+    }
+
+    private static void require(boolean condition, String message) {
+        if (!condition) {
+            throw new VerifyFailedException(message);
+        }
+    }
+
+    private static void assertReallocated(InMemoryMetricsCollector metrics, IncidentId incidentId, UnitId firstUnit, UnitId secondUnit) {
+        Optional<Instant> firstAssignedAt = metrics.decisions().stream()
+                .filter(r -> r.decision().assignment().incidentId().equals(incidentId))
+                .filter(r -> r.decision().assignment().unitId().equals(firstUnit))
+                .map(InMemoryMetricsCollector.DispatchDecisionRecord::at)
+                .findFirst();
+        Optional<Instant> secondAssignedAt = metrics.decisions().stream()
+                .filter(r -> r.decision().assignment().incidentId().equals(incidentId))
+                .filter(r -> r.decision().assignment().unitId().equals(secondUnit))
+                .map(InMemoryMetricsCollector.DispatchDecisionRecord::at)
+                .findFirst();
+
+        require(firstAssignedAt.isPresent(), "Expected assignment of " + firstUnit + " to " + incidentId);
+        require(secondAssignedAt.isPresent(), "Expected assignment of " + secondUnit + " to " + incidentId);
+        require(firstAssignedAt.get().isBefore(secondAssignedAt.get()),
+                "Expected reassignment ordering: " + firstUnit + " then " + secondUnit);
+    }
+
+    private static void assertAssigned(InMemoryMetricsCollector metrics, IncidentId incidentId, UnitId unitId) {
+        boolean exists = metrics.decisions().stream()
+                .anyMatch(r -> r.decision().assignment().incidentId().equals(incidentId)
+                        && r.decision().assignment().unitId().equals(unitId));
+        require(exists, "Expected assignment of " + unitId + " to " + incidentId);
+    }
+
+    private static boolean routeContainsEdge(List<com.neca.perds.model.NodeId> nodes, String from, String to) {
+        var fromId = new com.neca.perds.model.NodeId(from);
+        var toId = new com.neca.perds.model.NodeId(to);
+        for (int i = 0; i < nodes.size() - 1; i++) {
+            if (nodes.get(i).equals(fromId) && nodes.get(i + 1).equals(toId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final class VerifyFailedException extends RuntimeException {
+        private VerifyFailedException(String message) {
+            super(message);
         }
     }
 

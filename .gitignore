@@ -14,12 +14,5 @@ Thumbs.db
 
 # Logs
 *.log
-.cursor/
 
 data/out/
-
-AGENTS.md
-requirements.txt
-
-
-Final-Report.docx

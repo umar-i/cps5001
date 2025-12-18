@@ -242,7 +242,7 @@ public final class PerdsController implements SystemCommandExecutor {
         );
         assignmentRouteIndex.remove(incidentId);
 
-        Assignment assignment = assignments.get(incidentId);
+        Assignment assignment = assignments.remove(incidentId);
         if (assignment == null) {
             return;
         }

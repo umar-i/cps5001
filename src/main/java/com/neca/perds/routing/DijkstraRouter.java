@@ -46,12 +46,18 @@ public final class DijkstraRouter implements Router {
 
         double[] dist = new double[nodeIds.size()];
         int[] prev = new int[nodeIds.size()];
+        double[] totalDistanceKm = new double[nodeIds.size()];
+        Duration[] totalTravelTime = new Duration[nodeIds.size()];
         for (int i = 0; i < nodeIds.size(); i++) {
             dist[i] = Double.POSITIVE_INFINITY;
             prev[i] = -1;
+            totalDistanceKm[i] = 0.0;
+            totalTravelTime[i] = Duration.ZERO;
         }
 
         dist[startIndex] = 0.0;
+        totalDistanceKm[startIndex] = 0.0;
+        totalTravelTime[startIndex] = Duration.ZERO;
 
         var pq = new BinaryHeapIndexedMinPriorityQueue(nodeIds.size());
         pq.insert(startIndex, 0.0);
@@ -81,6 +87,8 @@ public final class DijkstraRouter implements Router {
                 if (alt < dist[v]) {
                     dist[v] = alt;
                     prev[v] = u;
+                    totalDistanceKm[v] = totalDistanceKm[u] + edge.weights().distanceKm();
+                    totalTravelTime[v] = totalTravelTime[u].plus(edge.weights().travelTime());
                     if (pq.contains(v)) {
                         pq.decreaseKey(v, alt);
                     } else {
@@ -95,12 +103,11 @@ public final class DijkstraRouter implements Router {
         }
 
         List<NodeId> path = reconstructPath(nodeIds, prev, goalIndex);
-        Totals totals = computeTotals(graph, path, costFunction);
         return Optional.of(new Route(
                 List.copyOf(path),
                 dist[goalIndex],
-                totals.totalDistanceKm,
-                totals.totalTravelTime,
+                totalDistanceKm[goalIndex],
+                totalTravelTime[goalIndex],
                 graphVersion
         ));
     }
@@ -115,28 +122,4 @@ public final class DijkstraRouter implements Router {
         Collections.reverse(reversed);
         return reversed;
     }
-
-    private static Totals computeTotals(GraphReadView graph, List<NodeId> path, EdgeCostFunction costFunction) {
-        double distanceKm = 0.0;
-        Duration travelTime = Duration.ZERO;
-
-        for (int i = 0; i < path.size() - 1; i++) {
-            NodeId from = path.get(i);
-            NodeId to = path.get(i + 1);
-            var edge = graph.getEdge(from, to)
-                    .orElseThrow(() -> new IllegalStateException("Missing edge in route: " + from + " -> " + to));
-
-            double edgeCost = costFunction.cost(edge);
-            if (Double.isNaN(edgeCost) || edgeCost < 0.0) {
-                throw new IllegalArgumentException("Edge cost must be non-negative and not NaN");
-            }
-
-            distanceKm += edge.weights().distanceKm();
-            travelTime = travelTime.plus(edge.weights().travelTime());
-        }
-
-        return new Totals(distanceKm, travelTime);
-    }
-
-    private record Totals(double totalDistanceKm, Duration totalTravelTime) {}
 }

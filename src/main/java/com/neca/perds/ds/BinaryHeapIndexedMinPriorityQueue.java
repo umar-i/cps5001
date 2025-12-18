@@ -158,7 +158,7 @@ public final class BinaryHeapIndexedMinPriorityQueue implements IndexedMinPriori
 
     private void ensureHeapCapacity(int requiredSize) {
         int requiredLength = requiredSize + 1;
-        if (requiredLength < heap.length) {
+        if (requiredLength <= heap.length) {
             return;
         }
         heap = Arrays.copyOf(heap, Math.max(requiredLength, heap.length * 2));

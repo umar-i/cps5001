@@ -75,6 +75,9 @@ public final class AdjacencyMapGraph implements Graph {
     @Override
     public long putEdge(Edge edge) {
         Objects.requireNonNull(edge, "edge");
+        if (!nodes.containsKey(edge.from()) || !nodes.containsKey(edge.to())) {
+            throw new IllegalStateException("Unknown node in edge: " + edge.from() + " -> " + edge.to());
+        }
         outgoing.computeIfAbsent(edge.from(), ignored -> new HashMap<>()).put(edge.to(), edge);
         return bumpVersion();
     }
@@ -96,6 +99,10 @@ public final class AdjacencyMapGraph implements Graph {
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(weights, "weights");
         Objects.requireNonNull(status, "status");
+
+        if (!nodes.containsKey(from) || !nodes.containsKey(to)) {
+            throw new IllegalStateException("Unknown node in edge: " + from + " -> " + to);
+        }
 
         var edges = outgoing.get(from);
         if (edges == null || !edges.containsKey(to)) {

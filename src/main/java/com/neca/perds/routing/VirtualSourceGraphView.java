@@ -102,5 +102,38 @@ public final class VirtualSourceGraphView implements GraphReadView {
     public long version() {
         return delegate.version();
     }
+
+    /**
+     * Strips the virtual source node from the beginning of a route.
+     * If the route does not start with the virtual source, returns it unchanged.
+     *
+     * @param route the route potentially starting with a virtual source node
+     * @param virtualSourceId the virtual source node ID to strip
+     * @return a new route without the virtual source prefix, or the original route if unchanged
+     * @throws IllegalArgumentException if route.nodes is empty
+     * @throws IllegalStateException if route contains only the virtual source node
+     */
+    public static Route stripVirtualSource(Route route, NodeId virtualSourceId) {
+        Objects.requireNonNull(route, "route");
+        Objects.requireNonNull(virtualSourceId, "virtualSourceId");
+
+        if (route.nodes().isEmpty()) {
+            throw new IllegalArgumentException("route.nodes must not be empty");
+        }
+        if (!route.nodes().getFirst().equals(virtualSourceId)) {
+            return route;
+        }
+        List<NodeId> nodes = route.nodes().subList(1, route.nodes().size());
+        if (nodes.isEmpty()) {
+            throw new IllegalStateException("Route contains only the virtual source node");
+        }
+        return new Route(
+                List.copyOf(nodes),
+                route.totalCost(),
+                route.totalDistanceKm(),
+                route.totalTravelTime(),
+                route.graphVersionUsed()
+        );
+    }
 }
 

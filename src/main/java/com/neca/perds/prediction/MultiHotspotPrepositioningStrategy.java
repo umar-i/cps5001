@@ -178,7 +178,7 @@ public final class MultiHotspotPrepositioningStrategy implements PrepositioningS
             return Optional.empty();
         }
 
-        Route route = stripVirtualSource(virtualRoute.get(), virtualSourceId);
+        Route route = VirtualSourceGraphView.stripVirtualSource(virtualRoute.get(), virtualSourceId);
         NodeId startNodeId = route.nodes().getFirst();
 
         List<ResponseUnit> candidates = availableUnitsByNodeId.get(startNodeId);
@@ -188,26 +188,6 @@ public final class MultiHotspotPrepositioningStrategy implements PrepositioningS
 
         return candidates.stream()
                 .min(Comparator.comparing((ResponseUnit u) -> u.id().value()));
-    }
-
-    private static Route stripVirtualSource(Route route, NodeId virtualSourceId) {
-        if (route.nodes().isEmpty()) {
-            throw new IllegalArgumentException("route.nodes must not be empty");
-        }
-        if (!route.nodes().getFirst().equals(virtualSourceId)) {
-            return route;
-        }
-        List<NodeId> nodes = route.nodes().subList(1, route.nodes().size());
-        if (nodes.isEmpty()) {
-            throw new IllegalStateException("Route contains only the virtual source node");
-        }
-        return new Route(
-                List.copyOf(nodes),
-                route.totalCost(),
-                route.totalDistanceKm(),
-                route.totalTravelTime(),
-                route.graphVersionUsed()
-        );
     }
 
     private static void removeUnit(Map<NodeId, List<ResponseUnit>> availableUnitsByNodeId, UnitId unitId) {

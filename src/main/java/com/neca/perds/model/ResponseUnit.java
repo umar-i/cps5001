@@ -28,5 +28,9 @@ public record ResponseUnit(
         return (status == UnitStatus.AVAILABLE || status == UnitStatus.REPOSITIONING) 
                 && assignedIncidentId.isEmpty();
     }
+
+    public ResponseUnit withStatusAndAssignment(UnitStatus newStatus, Optional<IncidentId> newAssignedIncidentId) {
+        return new ResponseUnit(id, type, newStatus, currentNodeId, newAssignedIncidentId, homeDispatchCentreId);
+    }
 }
 

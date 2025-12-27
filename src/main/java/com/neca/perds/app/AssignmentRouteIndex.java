@@ -4,7 +4,6 @@ import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.NodeId;
 import com.neca.perds.routing.Route;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -74,7 +73,7 @@ public final class AssignmentRouteIndex {
         for (int i = 0; i < nodes.size() - 1; i++) {
             uniqueEdges.add(new EdgeKey(nodes.get(i), nodes.get(i + 1)));
         }
-        return new ArrayList<>(uniqueEdges);
+        return List.copyOf(uniqueEdges);
     }
 
     private record EdgeKey(NodeId from, NodeId to) {

@@ -17,6 +17,9 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class AdaptiveEnsembleDemandPredictor implements DemandPredictor {
+    /** Default learning rate for the exponential weighting algorithm (Hedge). */
+    private static final double DEFAULT_LEARNING_RATE = 0.25;
+
     public record Model(String name, DemandPredictor predictor) {
         public Model {
             Objects.requireNonNull(name, "name");
@@ -56,7 +59,7 @@ public final class AdaptiveEnsembleDemandPredictor implements DemandPredictor {
                         new Model("slidingWindow", new SlidingWindowDemandPredictor(nodeId -> new ZoneId(nodeId.value()), Duration.ofHours(1))),
                         new Model("expSmoothing", new ExponentialSmoothingDemandPredictor(nodeId -> new ZoneId(nodeId.value()), 0.3))
                 ),
-                0.25
+                DEFAULT_LEARNING_RATE
         );
     }
 

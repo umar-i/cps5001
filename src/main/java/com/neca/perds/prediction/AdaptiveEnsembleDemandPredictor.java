@@ -144,6 +144,17 @@ public final class AdaptiveEnsembleDemandPredictor implements DemandPredictor {
         return new DemandForecast(at, horizon, Map.copyOf(combined));
     }
 
+    /**
+     * Updates model weights using exponential weighting based on forecast accuracy.
+     * 
+     * This implements the Hedge algorithm (a form of multiplicative weights update):
+     * 1. For each matured forecast, compute prediction error per model
+     * 2. Apply exponential penalty: newWeight = oldWeight * exp(-learningRate * error)
+     * 3. Normalize weights to sum to 1.0
+     * 
+     * Models with lower prediction error retain higher weights, making them
+     * contribute more to future ensemble forecasts.
+     */
     private void updateWeights(Instant now) {
         while (!pendingForecasts.isEmpty()) {
             ForecastRecord record = pendingForecasts.peekFirst();
@@ -162,6 +173,7 @@ public final class AdaptiveEnsembleDemandPredictor implements DemandPredictor {
                 double error = absoluteError(expected, actualCounts);
 
                 double oldWeight = weightsByModel.getOrDefault(name, 0.0);
+                // Exponential penalty: higher error → lower weight
                 double newWeight = oldWeight * Math.exp(-learningRate * error);
                 if (Double.isNaN(newWeight) || Double.isInfinite(newWeight) || newWeight < 0.0) {
                     newWeight = 0.0;
@@ -171,11 +183,13 @@ public final class AdaptiveEnsembleDemandPredictor implements DemandPredictor {
                 sum += newWeight;
             }
 
+            // If all weights collapsed to zero, reset to equal weights
             if (!(sum > 0.0) || Double.isNaN(sum) || Double.isInfinite(sum)) {
                 resetEqualWeights();
                 continue;
             }
 
+            // Normalize weights to sum to 1.0
             for (var entry : updated.entrySet()) {
                 weightsByModel.put(entry.getKey(), entry.getValue() / sum);
             }

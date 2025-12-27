@@ -21,6 +21,8 @@ import java.util.Optional;
 public final class VirtualSourceGraphView implements GraphReadView {
     private static final EdgeWeights VIRTUAL_EDGE_WEIGHTS = new EdgeWeights(0.0, Duration.ZERO, 1.0);
     private static final String VIRTUAL_NODE_LABEL = "__VIRTUAL_SOURCE__";
+    /** Maximum attempts to find a unique virtual source node ID before giving up. */
+    private static final int MAX_VIRTUAL_ID_ALLOCATION_ATTEMPTS = 10_000;
 
     private final GraphReadView delegate;
     private final NodeId virtualSourceId;
@@ -56,7 +58,7 @@ public final class VirtualSourceGraphView implements GraphReadView {
         if (graph.getNode(candidate).isEmpty() && !sourceNodes.contains(candidate)) {
             return candidate;
         }
-        for (int i = 1; i < 10_000; i++) {
+        for (int i = 1; i < MAX_VIRTUAL_ID_ALLOCATION_ATTEMPTS; i++) {
             NodeId withSuffix = new NodeId(VIRTUAL_NODE_LABEL + "_" + i);
             if (graph.getNode(withSuffix).isEmpty() && !sourceNodes.contains(withSuffix)) {
                 return withSuffix;

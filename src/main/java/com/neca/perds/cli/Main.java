@@ -51,6 +51,13 @@ import java.util.StringJoiner;
 import java.util.function.Supplier;
 
 public final class Main {
+    /** Minimum number of response units for synthetic load evaluation. */
+    private static final int MIN_UNIT_COUNT = 10;
+    /** Maximum number of response units for synthetic load evaluation. */
+    private static final int MAX_UNIT_COUNT = 40;
+    /** Divisor to calculate unit count from node count (1 unit per N nodes). */
+    private static final int NODES_PER_UNIT = 4;
+
     private Main() {}
 
     public static void main(String[] args) {
@@ -531,7 +538,7 @@ public final class Main {
     }
 
     private static SyntheticLoadConfig defaultLoadConfig(int nodeCount) {
-        int unitCount = Math.min(40, Math.max(10, nodeCount / 4));
+        int unitCount = Math.min(MAX_UNIT_COUNT, Math.max(MIN_UNIT_COUNT, nodeCount / NODES_PER_UNIT));
         int incidentCount = unitCount * 5;
         int congestionEvents = Math.max(20, nodeCount * 3);
         int unitOutages = Math.max(0, unitCount / 4);

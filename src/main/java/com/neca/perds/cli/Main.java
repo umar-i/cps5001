@@ -18,7 +18,6 @@ import com.neca.perds.model.Incident;
 import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.IncidentSeverity;
 import com.neca.perds.model.IncidentStatus;
-import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.Node;
 import com.neca.perds.model.NodeId;
 import com.neca.perds.model.NodeType;

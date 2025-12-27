@@ -450,6 +450,38 @@ public final class Main {
         }
     }
 
+    private record VariantAggregate(
+            String variant,
+            int runs,
+            double etaAvgMean,
+            double etaAvgP95,
+            double waitAvgMean,
+            double waitAvgP95,
+            double computeAvgMean,
+            double cancelsMean,
+            double reroutesMean
+    ) {
+        static VariantAggregate from(String variant, List<EvaluationRow> rows) {
+            List<Double> etaAvg = rows.stream().map(r -> r.summary().etaAvgSeconds()).toList();
+            List<Double> waitAvg = rows.stream().map(r -> r.summary().waitAvgSeconds()).toList();
+            List<Double> computeAvg = rows.stream().map(r -> r.summary().computeAvgMicros()).toList();
+            List<Double> cancels = rows.stream().map(r -> (double) r.summary().cancelCommands()).toList();
+            List<Double> reroutes = rows.stream().map(r -> (double) r.summary().rerouteCommands()).toList();
+
+            return new VariantAggregate(
+                    variant,
+                    rows.size(),
+                    mean(etaAvg),
+                    p95(etaAvg),
+                    mean(waitAvg),
+                    p95(waitAvg),
+                    mean(computeAvg),
+                    mean(cancels),
+                    mean(reroutes)
+            );
+        }
+    }
+
     private static void runEvaluation(String[] args) {
         if (args.length < 4) {
             printUsage();
@@ -563,11 +595,27 @@ public final class Main {
     }
 
     private static void writeEvaluationFiles(Path outDir, SyntheticLoadConfig config, List<EvaluationRow> rows) throws IOException {
-        Path summaryCsv = outDir.resolve("evaluation_summary.csv");
-        Path aggregateCsv = outDir.resolve("evaluation_aggregate.csv");
-        Path aggregateMd = outDir.resolve("evaluation_aggregate.md");
+        List<VariantAggregate> aggregates = aggregateByVariant(rows);
 
-        try (var writer = Files.newBufferedWriter(summaryCsv)) {
+        writeSummaryCsv(outDir.resolve("evaluation_summary.csv"), rows);
+        writeAggregateCsv(outDir.resolve("evaluation_aggregate.csv"), aggregates);
+        writeAggregateMd(outDir.resolve("evaluation_aggregate.md"), config, aggregates);
+    }
+
+    private static List<VariantAggregate> aggregateByVariant(List<EvaluationRow> rows) {
+        Map<String, List<EvaluationRow>> byVariant = new HashMap<>();
+        for (EvaluationRow row : rows) {
+            byVariant.computeIfAbsent(row.variant(), ignored -> new ArrayList<>()).add(row);
+        }
+
+        return byVariant.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> VariantAggregate.from(e.getKey(), e.getValue()))
+                .toList();
+    }
+
+    private static void writeSummaryCsv(Path path, List<EvaluationRow> rows) throws IOException {
+        try (var writer = Files.newBufferedWriter(path)) {
             writer.write("run,seed,variant,incidentsTotal,incidentsResolved,incidentsQueued,unitsTotal,decisions,assignCommands,rerouteCommands,cancelCommands,computeAvgMicros,computeP95Micros,computeMaxMicros,etaAvgSeconds,etaP95Seconds,waitAvgSeconds,waitP95Seconds,predictorWeights");
             writer.newLine();
             for (EvaluationRow row : rows) {
@@ -596,42 +644,32 @@ public final class Main {
                 writer.newLine();
             }
         }
+    }
 
-        Map<String, List<EvaluationRow>> byVariant = new HashMap<>();
-        for (EvaluationRow row : rows) {
-            byVariant.computeIfAbsent(row.variant(), ignored -> new ArrayList<>()).add(row);
-        }
-
-        try (var writer = Files.newBufferedWriter(aggregateCsv)) {
+    private static void writeAggregateCsv(Path path, List<VariantAggregate> aggregates) throws IOException {
+        try (var writer = Files.newBufferedWriter(path)) {
             writer.write("variant,runs,etaAvgSecondsMean,etaAvgSecondsP95Runs,waitAvgSecondsMean,waitAvgSecondsP95Runs,computeAvgMicrosMean,cancelCommandsMean,rerouteCommandsMean");
             writer.newLine();
 
-            for (var entry : byVariant.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
-                String variant = entry.getKey();
-                List<EvaluationRow> variantRows = entry.getValue();
-
-                List<Double> etaAvg = variantRows.stream().map(r -> r.summary().etaAvgSeconds()).toList();
-                List<Double> waitAvg = variantRows.stream().map(r -> r.summary().waitAvgSeconds()).toList();
-                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMicros()).toList();
-                List<Double> cancels = variantRows.stream().map(r -> (double) r.summary().cancelCommands()).toList();
-                List<Double> reroutes = variantRows.stream().map(r -> (double) r.summary().rerouteCommands()).toList();
-
+            for (VariantAggregate agg : aggregates) {
                 writer.write(csvRow(
-                        variant,
-                        String.valueOf(variantRows.size()),
-                        String.valueOf(mean(etaAvg)),
-                        String.valueOf(p95(etaAvg)),
-                        String.valueOf(mean(waitAvg)),
-                        String.valueOf(p95(waitAvg)),
-                        String.valueOf(mean(computeAvg)),
-                        String.valueOf(mean(cancels)),
-                        String.valueOf(mean(reroutes))
+                        agg.variant(),
+                        String.valueOf(agg.runs()),
+                        String.valueOf(agg.etaAvgMean()),
+                        String.valueOf(agg.etaAvgP95()),
+                        String.valueOf(agg.waitAvgMean()),
+                        String.valueOf(agg.waitAvgP95()),
+                        String.valueOf(agg.computeAvgMean()),
+                        String.valueOf(agg.cancelsMean()),
+                        String.valueOf(agg.reroutesMean())
                 ));
                 writer.newLine();
             }
         }
+    }
 
-        try (var writer = Files.newBufferedWriter(aggregateMd)) {
+    private static void writeAggregateMd(Path path, SyntheticLoadConfig config, List<VariantAggregate> aggregates) throws IOException {
+        try (var writer = Files.newBufferedWriter(path)) {
             writer.write("# Evaluation Aggregate");
             writer.newLine();
             writer.newLine();
@@ -654,25 +692,16 @@ public final class Main {
             writer.write("|---|---:|---:|---:|---:|---:|---:|---:|---:|");
             writer.newLine();
 
-            for (var entry : byVariant.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
-                String variant = entry.getKey();
-                List<EvaluationRow> variantRows = entry.getValue();
-
-                List<Double> etaAvg = variantRows.stream().map(r -> r.summary().etaAvgSeconds()).toList();
-                List<Double> waitAvg = variantRows.stream().map(r -> r.summary().waitAvgSeconds()).toList();
-                List<Double> computeAvg = variantRows.stream().map(r -> r.summary().computeAvgMicros()).toList();
-                List<Double> cancels = variantRows.stream().map(r -> (double) r.summary().cancelCommands()).toList();
-                List<Double> reroutes = variantRows.stream().map(r -> (double) r.summary().rerouteCommands()).toList();
-
-                writer.write("| " + variant
-                        + " | " + variantRows.size()
-                        + " | " + mean(etaAvg)
-                        + " | " + p95(etaAvg)
-                        + " | " + mean(waitAvg)
-                        + " | " + p95(waitAvg)
-                        + " | " + mean(computeAvg)
-                        + " | " + mean(cancels)
-                        + " | " + mean(reroutes)
+            for (VariantAggregate agg : aggregates) {
+                writer.write("| " + agg.variant()
+                        + " | " + agg.runs()
+                        + " | " + agg.etaAvgMean()
+                        + " | " + agg.etaAvgP95()
+                        + " | " + agg.waitAvgMean()
+                        + " | " + agg.waitAvgP95()
+                        + " | " + agg.computeAvgMean()
+                        + " | " + agg.cancelsMean()
+                        + " | " + agg.reroutesMean()
                         + " |");
                 writer.newLine();
             }

@@ -52,6 +52,9 @@ public final class PerdsController implements SystemCommandExecutor {
     private final Map<IncidentId, Assignment> assignments = new HashMap<>();
     private final AssignmentRouteIndex assignmentRouteIndex = new AssignmentRouteIndex();
 
+    // Tracks units that are repositioning (not teleporting)
+    private final Map<UnitId, PendingRepositioning> pendingRepositionings = new HashMap<>();
+
     public PerdsController(
             Graph graph,
             DispatchEngine dispatchEngine,
@@ -83,6 +86,8 @@ public final class PerdsController implements SystemCommandExecutor {
 
     @Override
     public void execute(SystemCommand command, Instant at) {
+        // First, complete any repositionings that have finished by this time
+        completeRepositionings(at);
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(at, "at");
 
@@ -162,6 +167,9 @@ public final class PerdsController implements SystemCommandExecutor {
         if (!unit.isAvailable()) {
             return;
         }
+
+        // Cancel any pending repositioning for this unit
+        pendingRepositionings.remove(command.unitId());
 
         Assignment assignment = new Assignment(command.incidentId(), command.unitId(), command.route(), at);
         assignments.put(
@@ -268,6 +276,11 @@ public final class PerdsController implements SystemCommandExecutor {
         if (assignedIncidentId.isPresent() && !isAssignmentCompatibleStatus(status)) {
             cancelAssignment(assignedIncidentId.get());
             unit = requireUnit(unitId);
+        }
+
+        // Cancel any pending repositioning if status changes
+        if (unit.status() == UnitStatus.REPOSITIONING && status != UnitStatus.REPOSITIONING) {
+            pendingRepositionings.remove(unitId);
         }
 
         units.put(
@@ -438,17 +451,97 @@ public final class PerdsController implements SystemCommandExecutor {
                 continue;
             }
 
+            // If route is available, use travel time; otherwise compute route
+            Route route;
+            if (move.route().isPresent()) {
+                route = move.route().get();
+            } else {
+                Optional<Route> computed = REROUTE_ROUTER.findRoute(
+                        graph, unit.currentNodeId(), move.targetNodeId(), REROUTE_COST_FUNCTION);
+                if (computed.isEmpty()) {
+                    continue; // No route available, skip this move
+                }
+                route = computed.get();
+            }
+
+            // Calculate arrival time based on travel time
+            Instant arrivalAt = at.plus(route.totalTravelTime());
+
+            // Set unit to REPOSITIONING status
             units.put(
                     unit.id(),
                     new ResponseUnit(
                             unit.id(),
                             unit.type(),
-                            unit.status(),
-                            move.targetNodeId(),
+                            UnitStatus.REPOSITIONING,
+                            unit.currentNodeId(), // Still at current location until arrival
                             Optional.empty(),
                             unit.homeDispatchCentreId()
                     )
             );
+
+            // Track pending repositioning for completion
+            pendingRepositionings.put(unit.id(), new PendingRepositioning(
+                    unit.id(),
+                    move.targetNodeId(),
+                    arrivalAt,
+                    move.reason()
+            ));
+        }
+    }
+
+    private void completeRepositionings(Instant at) {
+        List<UnitId> completed = pendingRepositionings.entrySet().stream()
+                .filter(e -> !e.getValue().arrivalAt().isAfter(at))
+                .map(Map.Entry::getKey)
+                .sorted(Comparator.comparing(UnitId::value))
+                .toList();
+
+        for (UnitId unitId : completed) {
+            PendingRepositioning repositioning = pendingRepositionings.remove(unitId);
+            if (repositioning == null) {
+                continue;
+            }
+
+            ResponseUnit unit = units.get(unitId);
+            if (unit == null) {
+                continue;
+            }
+
+            // Only complete if still repositioning (not reassigned to incident)
+            if (unit.status() != UnitStatus.REPOSITIONING) {
+                continue;
+            }
+
+            // Move unit to target location and set to AVAILABLE
+            units.put(
+                    unit.id(),
+                    new ResponseUnit(
+                            unit.id(),
+                            unit.type(),
+                            UnitStatus.AVAILABLE,
+                            repositioning.targetNodeId(),
+                            Optional.empty(),
+                            unit.homeDispatchCentreId()
+                    )
+            );
+        }
+    }
+
+    /**
+     * Record tracking a unit that is in transit to a new position.
+     */
+    private record PendingRepositioning(
+            UnitId unitId,
+            NodeId targetNodeId,
+            Instant arrivalAt,
+            String reason
+    ) {
+        private PendingRepositioning {
+            Objects.requireNonNull(unitId, "unitId");
+            Objects.requireNonNull(targetNodeId, "targetNodeId");
+            Objects.requireNonNull(arrivalAt, "arrivalAt");
+            Objects.requireNonNull(reason, "reason");
         }
     }
 }

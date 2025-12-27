@@ -89,19 +89,21 @@ public final class MultiHotspotPrepositioningStrategy implements PrepositioningS
                     break;
                 }
 
-                Optional<ResponseUnit> chosen = chooseNearestUnitTo(snapshot, availableUnitsByNodeId, zone.targetNodeId);
+                Optional<UnitRouteSelection> chosen = chooseNearestUnitTo(snapshot, availableUnitsByNodeId, zone.targetNodeId);
                 if (chosen.isEmpty()) {
                     break;
                 }
 
-                ResponseUnit unit = chosen.get();
+                UnitRouteSelection selection = chosen.get();
+                ResponseUnit unit = selection.unit();
                 removeUnit(availableUnitsByNodeId, unit.id());
 
                 if (!unit.currentNodeId().equals(zone.targetNodeId)) {
                     moves.add(new RepositionMove(
                             unit.id(),
                             zone.targetNodeId,
-                            "zone=" + zone.zoneId + " expected=" + zone.score
+                            "zone=" + zone.zoneId + " expected=" + zone.score,
+                            Optional.of(selection.route())
                     ));
                 }
             }
@@ -169,7 +171,7 @@ public final class MultiHotspotPrepositioningStrategy implements PrepositioningS
         return Map.copyOf(base);
     }
 
-    private Optional<ResponseUnit> chooseNearestUnitTo(SystemSnapshot snapshot, Map<NodeId, List<ResponseUnit>> availableUnitsByNodeId, NodeId targetNodeId) {
+    private Optional<UnitRouteSelection> chooseNearestUnitTo(SystemSnapshot snapshot, Map<NodeId, List<ResponseUnit>> availableUnitsByNodeId, NodeId targetNodeId) {
         NodeId virtualSourceId = VirtualSourceGraphView.allocateVirtualSourceId(snapshot.graph(), availableUnitsByNodeId.keySet());
         var graph = new VirtualSourceGraphView(snapshot.graph(), virtualSourceId, availableUnitsByNodeId.keySet());
 
@@ -186,8 +188,9 @@ public final class MultiHotspotPrepositioningStrategy implements PrepositioningS
             return Optional.empty();
         }
 
-        return candidates.stream()
+        Optional<ResponseUnit> unit = candidates.stream()
                 .min(Comparator.comparing((ResponseUnit u) -> u.id().value()));
+        return unit.map(u -> new UnitRouteSelection(u, route));
     }
 
     private static void removeUnit(Map<NodeId, List<ResponseUnit>> availableUnitsByNodeId, UnitId unitId) {
@@ -198,5 +201,7 @@ public final class MultiHotspotPrepositioningStrategy implements PrepositioningS
     }
 
     private record ZoneScore(ZoneId zoneId, NodeId targetNodeId, double score) {}
+
+    private record UnitRouteSelection(ResponseUnit unit, Route route) {}
 }
 

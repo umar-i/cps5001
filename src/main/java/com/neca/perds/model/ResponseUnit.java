@@ -20,8 +20,13 @@ public record ResponseUnit(
         Objects.requireNonNull(homeDispatchCentreId, "homeDispatchCentreId");
     }
 
+    /**
+     * Returns true if this unit can be assigned to an incident.
+     * Units that are AVAILABLE or REPOSITIONING (can be interrupted) are eligible.
+     */
     public boolean isAvailable() {
-        return status == UnitStatus.AVAILABLE && assignedIncidentId.isEmpty();
+        return (status == UnitStatus.AVAILABLE || status == UnitStatus.REPOSITIONING) 
+                && assignedIncidentId.isEmpty();
     }
 }
 

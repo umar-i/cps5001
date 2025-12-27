@@ -51,9 +51,6 @@ public final class PerdsController implements SystemCommandExecutor {
     private final Map<IncidentId, Assignment> assignments = new HashMap<>();
     private final AssignmentRouteIndex assignmentRouteIndex = new AssignmentRouteIndex();
 
-    // Tracks units that are repositioning (not teleporting)
-    private final Map<UnitId, PendingRepositioning> pendingRepositionings = new HashMap<>();
-
     public PerdsController(
             Graph graph,
             DispatchEngine dispatchEngine,
@@ -86,7 +83,7 @@ public final class PerdsController implements SystemCommandExecutor {
     @Override
     public void execute(SystemCommand command, Instant at) {
         // First, complete any repositionings that have finished by this time
-        completeRepositionings(at);
+        unitManager.completeRepositionings(at);
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(at, "at");
 
@@ -167,9 +164,6 @@ public final class PerdsController implements SystemCommandExecutor {
             return;
         }
 
-        // Cancel any pending repositioning for this unit
-        pendingRepositionings.remove(command.unitId());
-
         Assignment assignment = new Assignment(command.incidentId(), command.unitId(), command.route(), at);
         assignments.put(command.incidentId(), assignment);
         assignmentRouteIndex.put(assignment.incidentId(), assignment.route());
@@ -227,41 +221,8 @@ public final class PerdsController implements SystemCommandExecutor {
 
         // Cancel any pending repositioning if status changes
         if (unit.status() == UnitStatus.REPOSITIONING && status != UnitStatus.REPOSITIONING) {
-            pendingRepositionings.remove(unitId);
+            unitManager.cancelRepositioning(unitId);
         }
-
-        units.put(
-                unitId,
-                new ResponseUnit(
-                        unit.id(),
-                        unit.type(),
-                        status,
-                        unit.currentNodeId(),
-                        unit.assignedIncidentId(),
-                        unit.homeDispatchCentreId()
-                )
-        );
-    }
-
-    private void moveUnit(UnitId unitId, NodeId newNodeId) {
-        ResponseUnit unit = requireUnit(unitId);
-        units.put(
-                unitId,
-                new ResponseUnit(
-                        unit.id(),
-                        unit.type(),
-                        unit.status(),
-                        newNodeId,
-                        unit.assignedIncidentId(),
-                        unit.homeDispatchCentreId()
-                )
-        );
-    }
-
-    private ResponseUnit requireUnit(UnitId unitId) {
-        return Optional.ofNullable(units.get(unitId))
-                .orElseThrow(() -> new IllegalStateException("Unknown unit: " + unitId));
-    }
 
         unitManager.setStatus(unitId, status);
     }
@@ -372,81 +333,8 @@ public final class PerdsController implements SystemCommandExecutor {
             // Calculate arrival time based on travel time
             Instant arrivalAt = at.plus(route.totalTravelTime());
 
-            // Set unit to REPOSITIONING status
-            units.put(
-                    unit.id(),
-                    new ResponseUnit(
-                            unit.id(),
-                            unit.type(),
-                            UnitStatus.REPOSITIONING,
-                            unit.currentNodeId(), // Still at current location until arrival
-                            Optional.empty(),
-                            unit.homeDispatchCentreId()
-                    )
-            );
-
-            // Track pending repositioning for completion
-            pendingRepositionings.put(unit.id(), new PendingRepositioning(
-                    unit.id(),
-                    move.targetNodeId(),
-                    arrivalAt,
-                    move.reason()
-            ));
-        }
-    }
-
-    private void completeRepositionings(Instant at) {
-        List<UnitId> completed = pendingRepositionings.entrySet().stream()
-                .filter(e -> !e.getValue().arrivalAt().isAfter(at))
-                .map(Map.Entry::getKey)
-                .sorted(Comparator.comparing(UnitId::value))
-                .toList();
-
-        for (UnitId unitId : completed) {
-            PendingRepositioning repositioning = pendingRepositionings.remove(unitId);
-            if (repositioning == null) {
-                continue;
-            }
-
-            ResponseUnit unit = units.get(unitId);
-            if (unit == null) {
-                continue;
-            }
-
-            // Only complete if still repositioning (not reassigned to incident)
-            if (unit.status() != UnitStatus.REPOSITIONING) {
-                continue;
-            }
-
-            // Move unit to target location and set to AVAILABLE
-            units.put(
-                    unit.id(),
-                    new ResponseUnit(
-                            unit.id(),
-                            unit.type(),
-                            UnitStatus.AVAILABLE,
-                            repositioning.targetNodeId(),
-                            Optional.empty(),
-                            unit.homeDispatchCentreId()
-                    )
-            );
-        }
-    }
-
-    /**
-     * Record tracking a unit that is in transit to a new position.
-     */
-    private record PendingRepositioning(
-            UnitId unitId,
-            NodeId targetNodeId,
-            Instant arrivalAt,
-            String reason
-    ) {
-        private PendingRepositioning {
-            Objects.requireNonNull(unitId, "unitId");
-            Objects.requireNonNull(targetNodeId, "targetNodeId");
-            Objects.requireNonNull(arrivalAt, "arrivalAt");
-            Objects.requireNonNull(reason, "reason");
+            // Start repositioning via UnitManager
+            unitManager.startRepositioning(unit.id(), move.targetNodeId(), arrivalAt, move.reason());
         }
     }
 }

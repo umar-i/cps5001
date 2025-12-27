@@ -8,6 +8,7 @@ public record DispatchCentreId(String value) {
         if (value.isBlank()) {
             throw new IllegalArgumentException("value must not be blank");
         }
+        IdValidation.validateAlphanumericId(value, "DispatchCentreId");
     }
 
     @Override

@@ -136,46 +136,66 @@ if (totalTravelTime.isNegative()) {
 
 ## 3. Code Smells and Refactoring Opportunities
 
-### 3.1 HIGH PRIORITY REFACTORING
+### 3.1 HIGH PRIORITY REFACTORING ✅ COMPLETED
 
-#### Smell #1: Large Class - PerdsController (~530 lines after fixes)
-**Issue:** The `PerdsController` class handles many responsibilities: command execution, dispatch coordination, incident management, unit management, repositioning tracking.  
-**Refactoring:** Apply Single Responsibility Principle:
-- Extract `IncidentManager` for incident lifecycle
-- Extract `UnitManager` for unit state management
-- Keep `PerdsController` as orchestrator
+#### Smell #1: Large Class - PerdsController ✅ FIXED
+**Issue:** The `PerdsController` class was ~530 lines handling multiple responsibilities: command execution, dispatch coordination, incident management, unit management, repositioning tracking.  
+**Fix Applied:** Applied Single Responsibility Principle:
+- Extracted `IncidentManager` for incident lifecycle management
+- Extracted `UnitManager` for unit state management
+- `PerdsController` reduced from ~530 to ~295 lines, now acts as orchestrator
 
-#### Smell #2: Primitive Obsession - Using String for IDs
-**Issue:** `NodeId`, `UnitId`, `IncidentId`, etc. wrap strings but don't enforce format validation.  
-**Recommendation:** Add regex validation for ID formats if there are naming conventions.
+#### Smell #2: Primitive Obsession - Using String for IDs ✅ FIXED
+**Issue:** `NodeId`, `UnitId`, `IncidentId`, etc. wrapped strings without format validation.  
+**Fix Applied:**
+- Created `IdValidation` utility class with regex patterns
+- `ALPHANUMERIC_ID_PATTERN`: For general IDs (letters, digits, underscores, hyphens)
+- `UNIT_ID_PATTERN`: For unit IDs (must start with letter)
+- `INCIDENT_ID_PATTERN`: For incident IDs (must start with letter)
+- Updated `NodeId`, `UnitId`, `IncidentId` records to use validation
 
-### 3.2 MEDIUM PRIORITY REFACTORING
+### 3.2 MEDIUM PRIORITY REFACTORING ✅ COMPLETED
 
-#### Smell #3: Long Method - Main.runEvaluation() (130+ lines)
+#### Smell #3: Long Method - Main.runEvaluation() ✅ FIXED
 **Location:** `Main.java`  
-**Refactoring:** Extract helper methods for configuration loading, variant execution, and result aggregation.
+**Issue:** `writeEvaluationFiles()` was ~115 lines with three distinct responsibilities.  
+**Fix Applied:** 
+- Extracted `writeSummaryCsv()`, `writeAggregateCsv()`, `writeAggregateMd()` methods
+- Created `VariantAggregate` record to eliminate duplicated aggregation logic
+- Added `aggregateByVariant()` helper method
 
-#### Smell #4: Feature Envy - DefaultDispatchEngine accesses SystemSnapshot internals
+#### Smell #4: Feature Envy - DefaultDispatchEngine accesses SystemSnapshot internals ✅ FIXED
 **Location:** `DefaultDispatchEngine.java`  
-**Issue:** Creates working copies of units/assignments manually.  
-**Refactoring:** Add `SystemSnapshot.withUpdatedUnit()` or builder pattern.
+**Issue:** Manually created working copies of units/assignments and reconstructed `SystemSnapshot` and `ResponseUnit` objects.  
+**Fix Applied:**
+- Added `SystemSnapshot.withUpdatedUnit(ResponseUnit)` method
+- Added `SystemSnapshot.withAddedAssignment(Assignment)` method
+- Added `ResponseUnit.withStatusAndAssignment(UnitStatus, Optional<IncidentId>)` method
+- Refactored `DefaultDispatchEngine.compute()` to use these helpers instead of manual manipulation
 
-#### Smell #5: Comments Where Code Should Be Self-Documenting
-**Observation:** Complex algorithms like `AdaptiveEnsembleDemandPredictor.updateWeights()` would benefit from inline comments explaining the exponential weighting scheme.
+#### Smell #5: Comments Where Code Should Be Self-Documenting ✅ FIXED
+**Location:** `AdaptiveEnsembleDemandPredictor.java`  
+**Issue:** Complex `updateWeights()` algorithm lacked explanation.  
+**Fix Applied:** Added Javadoc and inline comments explaining:
+- The Hedge algorithm (multiplicative weights update)
+- Exponential penalty calculation: `newWeight = oldWeight * exp(-learningRate * error)`
+- Weight normalization step
+- Edge case handling when all weights collapse to zero
 
-### 3.3 LOW PRIORITY REFACTORING
+### 3.3 LOW PRIORITY REFACTORING ✅ COMPLETED
 
-#### Smell #6: Magic Numbers
-**Locations:**
-- `VirtualSourceGraphView.java`: `10_000` iterations for ID allocation
-- `Main.java`: `Math.min(40, Math.max(10, nodeCount / 4))`
-- `AdaptiveEnsembleDemandPredictor.java`: default `learningRate = 0.25`
+#### Smell #6: Magic Numbers ✅ FIXED
+**Locations and Fixes:**
+- `VirtualSourceGraphView.java`: Extracted `MAX_VIRTUAL_ID_ALLOCATION_ATTEMPTS = 10_000`
+- `Main.java`: Extracted `MIN_UNIT_COUNT = 10`, `MAX_UNIT_COUNT = 40`, `NODES_PER_UNIT = 4`
+- `AdaptiveEnsembleDemandPredictor.java`: Extracted `DEFAULT_LEARNING_RATE = 0.25`
 
-**Refactoring:** Extract to named constants with documentation.
+All constants include Javadoc documentation explaining their purpose.
 
-#### Smell #7: Inconsistent Collection Return Types
-**Issue:** Some methods return `List.of()`, others return `List.copyOf()`.  
-**Recommendation:** Standardize on immutable returns for public APIs.
+#### Smell #7: Inconsistent Collection Return Types ✅ FIXED
+**Location:** `AssignmentRouteIndex.java`  
+**Issue:** Private method `edgesOf()` returned `new ArrayList<>(uniqueEdges)` while all public APIs return immutable collections.  
+**Fix Applied:** Changed to `List.copyOf(uniqueEdges)` and removed unused `ArrayList` import.
 
 ---
 
@@ -310,13 +330,17 @@ if (totalTravelTime.isNegative()) {
 2. ~~Extract `stripVirtualSource()` to shared utility~~ ✅ Fixed
 3. ~~Add logging for missing coordinates in EuclideanHeuristic~~ ✅ Fixed
 4. ~~Implement travel-time-based repositioning~~ ✅ Fixed
+5. ~~Large Class: Extract IncidentManager and UnitManager from PerdsController~~ ✅ Fixed
+6. ~~Primitive Obsession: Add ID format validation~~ ✅ Fixed
+7. ~~Long Method: Extract helper methods in Main.java~~ ✅ Fixed
+8. ~~Feature Envy: Add SystemSnapshot/ResponseUnit helper methods~~ ✅ Fixed
+9. ~~Add inline documentation for complex algorithms~~ ✅ Fixed
+10. ~~Extract magic numbers to named constants~~ ✅ Fixed
+11. ~~Standardize collection return types~~ ✅ Fixed
 
 ### Remaining (Nice to Have)
-1. Refactor `PerdsController` to reduce size (code smell)
-2. Add inline documentation for complex algorithms
-3. Extract magic numbers to named constants
-4. Multi-unit incident dispatch support
-5. Configuration file support
+1. Multi-unit incident dispatch support
+2. Configuration file support
 
 ---
 
@@ -335,7 +359,7 @@ The codebase successfully meets all requirements for the **First Class (80-100) 
 - Working evaluation framework
 - Realistic simulation behavior (including travel-time-based repositioning)
 
-**All identified bugs have been fixed without introducing regressions.** The code is ready for submission.
+**All identified bugs have been fixed without introducing regressions.** All high, medium, and low priority code smells have been refactored. The code is ready for submission.
 
 ---
 
@@ -351,4 +375,4 @@ All tests pass after bug fixes, confirming no regressions were introduced.
 ---
 
 *Report generated by code review analysis on December 27, 2025*  
-*Last updated: December 27, 2025 after bug fixes*
+*Last updated: December 27, 2025 after bug fixes and refactoring*

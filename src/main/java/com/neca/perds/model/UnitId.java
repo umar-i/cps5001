@@ -8,6 +8,7 @@ public record UnitId(String value) {
         if (value.isBlank()) {
             throw new IllegalArgumentException("value must not be blank");
         }
+        IdValidation.validateUnitId(value);
     }
 
     @Override

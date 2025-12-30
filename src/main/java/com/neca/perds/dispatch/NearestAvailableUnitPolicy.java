@@ -3,6 +3,7 @@ package com.neca.perds.dispatch;
 import com.neca.perds.model.Assignment;
 import com.neca.perds.model.Incident;
 import com.neca.perds.model.IncidentId;
+import com.neca.perds.model.IncidentSeverity;
 import com.neca.perds.model.IncidentStatus;
 import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
@@ -77,6 +78,10 @@ public final class NearestAvailableUnitPolicy implements DispatchPolicy {
                 if (selectedUnitIds.contains(unit.id())) {
                     continue;
                 }
+                // Check capacity and specialization requirements
+                if (!unit.meetsRequirements(incident.requiredCapacity(), incident.requiredSpecializationLevel())) {
+                    continue;
+                }
 
                 Optional<Route> route = router.findRoute(
                         snapshot.graph(),
@@ -89,7 +94,7 @@ public final class NearestAvailableUnitPolicy implements DispatchPolicy {
                 }
 
                 Candidate candidate = new Candidate(unit, route.get());
-                if (best == null || candidate.isBetterThan(best)) {
+                if (best == null || candidate.isBetterThan(best, incident)) {
                     best = candidate;
                 }
             }
@@ -144,11 +149,26 @@ public final class NearestAvailableUnitPolicy implements DispatchPolicy {
     }
 
     private record Candidate(ResponseUnit unit, Route route) {
-        private boolean isBetterThan(Candidate other) {
+        /**
+         * Compares candidates considering travel cost, specialization preference for severe incidents,
+         * distance, and unit ID as tiebreaker.
+         * 
+         * For HIGH/CRITICAL incidents, prefers higher specialization when costs are similar.
+         */
+        private boolean isBetterThan(Candidate other, Incident incident) {
             int costComparison = Double.compare(route.totalCost(), other.route.totalCost());
             if (costComparison != 0) {
                 return costComparison < 0;
             }
+            
+            // For severe incidents, prefer higher specialization when costs are equal
+            if (incident.severity().level() >= IncidentSeverity.HIGH.level()) {
+                int specComparison = Integer.compare(unit.specializationLevel(), other.unit.specializationLevel());
+                if (specComparison != 0) {
+                    return specComparison > 0; // Higher specialization is better
+                }
+            }
+            
             int distanceComparison = Double.compare(route.totalDistanceKm(), other.route.totalDistanceKm());
             if (distanceComparison != 0) {
                 return distanceComparison < 0;

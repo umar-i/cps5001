@@ -7,6 +7,7 @@ import com.neca.perds.model.IncidentStatus;
 import com.neca.perds.model.NodeId;
 import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
+import com.neca.perds.model.UnitType;
 import com.neca.perds.routing.CostFunctions;
 import com.neca.perds.routing.DijkstraRouter;
 import com.neca.perds.routing.EdgeCostFunction;
@@ -18,11 +19,13 @@ import com.neca.perds.system.SystemSnapshot;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPolicy {
     private final Router router;
@@ -39,22 +42,59 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
 
     @Override
     public Optional<DispatchDecision> choose(SystemSnapshot snapshot, Incident incident) {
+        List<DispatchDecision> decisions = chooseAll(snapshot, incident);
+        return decisions.isEmpty() ? Optional.empty() : Optional.of(decisions.getFirst());
+    }
+
+    @Override
+    public List<DispatchDecision> chooseAll(SystemSnapshot snapshot, Incident incident) {
         Objects.requireNonNull(snapshot, "snapshot");
         Objects.requireNonNull(incident, "incident");
 
         if (!isDispatchable(incident)) {
-            return Optional.empty();
-        }
-        if (hasAssignment(snapshot, incident.id())) {
-            return Optional.empty();
+            return List.of();
         }
 
+        // Determine which unit types still need to be dispatched
+        Set<UnitType> alreadyAssignedTypes = getAssignedUnitTypes(snapshot, incident.id());
+        Set<UnitType> neededTypes = new HashSet<>(incident.requiredUnitTypes());
+        neededTypes.removeAll(alreadyAssignedTypes);
+
+        if (neededTypes.isEmpty()) {
+            return List.of();
+        }
+
+        // Track units we've already selected in this round to avoid double-selection
+        Set<UnitId> selectedUnitIds = new HashSet<>();
+        List<DispatchDecision> decisions = new ArrayList<>();
+
+        // For each needed type, find the best available unit using multi-source routing
+        for (UnitType neededType : neededTypes) {
+            Optional<DispatchDecision> decision = chooseForType(snapshot, incident, neededType, selectedUnitIds);
+            if (decision.isPresent()) {
+                selectedUnitIds.add(decision.get().assignment().unitId());
+                decisions.add(decision.get());
+            }
+        }
+
+        return List.copyOf(decisions);
+    }
+
+    private Optional<DispatchDecision> chooseForType(
+            SystemSnapshot snapshot,
+            Incident incident,
+            UnitType requiredType,
+            Set<UnitId> excludedUnitIds
+    ) {
         Map<NodeId, List<ResponseUnit>> eligibleUnitsByNodeId = new HashMap<>();
         for (ResponseUnit unit : snapshot.units()) {
             if (!unit.isAvailable()) {
                 continue;
             }
-            if (!incident.requiredUnitTypes().contains(unit.type())) {
+            if (unit.type() != requiredType) {
+                continue;
+            }
+            if (excludedUnitIds.contains(unit.id())) {
                 continue;
             }
             eligibleUnitsByNodeId
@@ -78,9 +118,13 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
         NodeId startNodeId = route.nodes().getFirst();
 
         ResponseUnit chosenUnit = chooseUnitAtStartNode(eligibleUnitsByNodeId.get(startNodeId));
+        return Optional.of(createDecision(incident, chosenUnit, route, snapshot));
+    }
+
+    private DispatchDecision createDecision(Incident incident, ResponseUnit unit, Route route, SystemSnapshot snapshot) {
         var assignment = new Assignment(
                 incident.id(),
-                chosenUnit.id(),
+                unit.id(),
                 route,
                 snapshot.now()
         );
@@ -91,7 +135,7 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
         components.put("severityLevel", (double) incident.severity().level());
 
         DispatchRationale rationale = new DispatchRationale(-route.totalCost(), Map.copyOf(components));
-        return Optional.of(new DispatchDecision(assignment, rationale));
+        return new DispatchDecision(assignment, rationale);
     }
 
     private static ResponseUnit chooseUnitAtStartNode(List<ResponseUnit> candidates) {
@@ -107,8 +151,23 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
         return incident.status() == IncidentStatus.REPORTED || incident.status() == IncidentStatus.QUEUED;
     }
 
-    private static boolean hasAssignment(SystemSnapshot snapshot, IncidentId incidentId) {
-        return snapshot.assignments().stream().anyMatch(a -> a.incidentId().equals(incidentId));
+    /**
+     * Returns the set of unit types that have already been assigned to the incident.
+     */
+    private static Set<UnitType> getAssignedUnitTypes(SystemSnapshot snapshot, IncidentId incidentId) {
+        Set<UnitType> assignedTypes = new HashSet<>();
+        for (var assignment : snapshot.assignments()) {
+            if (assignment.incidentId().equals(incidentId)) {
+                // Find the unit to get its type
+                for (var unit : snapshot.units()) {
+                    if (unit.id().equals(assignment.unitId())) {
+                        assignedTypes.add(unit.type());
+                        break;
+                    }
+                }
+            }
+        }
+        return assignedTypes;
     }
 }
 

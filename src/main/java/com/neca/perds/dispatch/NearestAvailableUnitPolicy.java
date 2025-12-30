@@ -6,6 +6,7 @@ import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.IncidentStatus;
 import com.neca.perds.model.ResponseUnit;
 import com.neca.perds.model.UnitId;
+import com.neca.perds.model.UnitType;
 import com.neca.perds.routing.CostFunctions;
 import com.neca.perds.routing.DijkstraRouter;
 import com.neca.perds.routing.EdgeCostFunction;
@@ -13,10 +14,14 @@ import com.neca.perds.routing.Route;
 import com.neca.perds.routing.Router;
 import com.neca.perds.system.SystemSnapshot;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public final class NearestAvailableUnitPolicy implements DispatchPolicy {
     private final Router router;
@@ -33,67 +38,109 @@ public final class NearestAvailableUnitPolicy implements DispatchPolicy {
 
     @Override
     public Optional<DispatchDecision> choose(SystemSnapshot snapshot, Incident incident) {
+        List<DispatchDecision> decisions = chooseAll(snapshot, incident);
+        return decisions.isEmpty() ? Optional.empty() : Optional.of(decisions.getFirst());
+    }
+
+    @Override
+    public List<DispatchDecision> chooseAll(SystemSnapshot snapshot, Incident incident) {
         Objects.requireNonNull(snapshot, "snapshot");
         Objects.requireNonNull(incident, "incident");
 
         if (!isDispatchable(incident)) {
-            return Optional.empty();
-        }
-        if (hasAssignment(snapshot, incident.id())) {
-            return Optional.empty();
+            return List.of();
         }
 
-        Candidate best = null;
-        for (ResponseUnit unit : snapshot.units()) {
-            if (!unit.isAvailable()) {
-                continue;
-            }
-            if (!incident.requiredUnitTypes().contains(unit.type())) {
-                continue;
+        // Determine which unit types still need to be dispatched
+        Set<UnitType> alreadyAssignedTypes = getAssignedUnitTypes(snapshot, incident.id());
+        Set<UnitType> neededTypes = new HashSet<>(incident.requiredUnitTypes());
+        neededTypes.removeAll(alreadyAssignedTypes);
+
+        if (neededTypes.isEmpty()) {
+            return List.of();
+        }
+
+        // Track units we've already selected in this round to avoid double-selection
+        Set<UnitId> selectedUnitIds = new HashSet<>();
+        List<DispatchDecision> decisions = new ArrayList<>();
+
+        // For each needed type, find the best available unit
+        for (UnitType neededType : neededTypes) {
+            Candidate best = null;
+            for (ResponseUnit unit : snapshot.units()) {
+                if (!unit.isAvailable()) {
+                    continue;
+                }
+                if (unit.type() != neededType) {
+                    continue;
+                }
+                if (selectedUnitIds.contains(unit.id())) {
+                    continue;
+                }
+
+                Optional<Route> route = router.findRoute(
+                        snapshot.graph(),
+                        unit.currentNodeId(),
+                        incident.locationNodeId(),
+                        costFunction
+                );
+                if (route.isEmpty()) {
+                    continue;
+                }
+
+                Candidate candidate = new Candidate(unit, route.get());
+                if (best == null || candidate.isBetterThan(best)) {
+                    best = candidate;
+                }
             }
 
-            Optional<Route> route = router.findRoute(
-                    snapshot.graph(),
-                    unit.currentNodeId(),
-                    incident.locationNodeId(),
-                    costFunction
-            );
-            if (route.isEmpty()) {
-                continue;
-            }
-
-            Candidate candidate = new Candidate(unit, route.get());
-            if (best == null || candidate.isBetterThan(best)) {
-                best = candidate;
+            if (best != null) {
+                selectedUnitIds.add(best.unit.id());
+                decisions.add(createDecision(incident, best, snapshot));
             }
         }
 
-        if (best == null) {
-            return Optional.empty();
-        }
+        return List.copyOf(decisions);
+    }
 
+    private DispatchDecision createDecision(Incident incident, Candidate candidate, SystemSnapshot snapshot) {
         var assignment = new Assignment(
                 incident.id(),
-                best.unit.id(),
-                best.route,
+                candidate.unit.id(),
+                candidate.route,
                 snapshot.now()
         );
 
         Map<String, Double> components = new LinkedHashMap<>();
-        components.put("travelTimeSeconds", (double) best.route.totalTravelTime().toSeconds());
-        components.put("distanceKm", best.route.totalDistanceKm());
+        components.put("travelTimeSeconds", (double) candidate.route.totalTravelTime().toSeconds());
+        components.put("distanceKm", candidate.route.totalDistanceKm());
         components.put("severityLevel", (double) incident.severity().level());
 
-        DispatchRationale rationale = new DispatchRationale(-best.route.totalCost(), Map.copyOf(components));
-        return Optional.of(new DispatchDecision(assignment, rationale));
+        DispatchRationale rationale = new DispatchRationale(-candidate.route.totalCost(), Map.copyOf(components));
+        return new DispatchDecision(assignment, rationale);
     }
 
     private static boolean isDispatchable(Incident incident) {
         return incident.status() == IncidentStatus.REPORTED || incident.status() == IncidentStatus.QUEUED;
     }
 
-    private static boolean hasAssignment(SystemSnapshot snapshot, IncidentId incidentId) {
-        return snapshot.assignments().stream().anyMatch(a -> a.incidentId().equals(incidentId));
+    /**
+     * Returns the set of unit types that have already been assigned to the incident.
+     */
+    private static Set<UnitType> getAssignedUnitTypes(SystemSnapshot snapshot, IncidentId incidentId) {
+        Set<UnitType> assignedTypes = new HashSet<>();
+        for (var assignment : snapshot.assignments()) {
+            if (assignment.incidentId().equals(incidentId)) {
+                // Find the unit to get its type
+                for (var unit : snapshot.units()) {
+                    if (unit.id().equals(assignment.unitId())) {
+                        assignedTypes.add(unit.type());
+                        break;
+                    }
+                }
+            }
+        }
+        return assignedTypes;
     }
 
     private record Candidate(ResponseUnit unit, Route route) {

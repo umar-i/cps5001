@@ -32,32 +32,31 @@ public final class DefaultDispatchEngine implements DispatchEngine {
         List<DispatchCommand> commands = new ArrayList<>();
 
         for (Incident incident : incidents) {
-            Optional<DispatchDecision> decision = dispatchPolicy.choose(workingSnapshot, incident);
-            if (decision.isEmpty()) {
-                continue;
-            }
+            // Use chooseAll to get dispatch decisions for all required unit types
+            List<DispatchDecision> decisions = dispatchPolicy.chooseAll(workingSnapshot, incident);
+            
+            for (DispatchDecision dispatchDecision : decisions) {
+                var assignment = dispatchDecision.assignment();
 
-            DispatchDecision dispatchDecision = decision.get();
-            var assignment = dispatchDecision.assignment();
+                commands.add(new DispatchCommand.AssignUnitCommand(
+                        assignment.incidentId(),
+                        assignment.unitId(),
+                        assignment.route(),
+                        dispatchDecision.rationale()
+                ));
 
-            commands.add(new DispatchCommand.AssignUnitCommand(
-                    assignment.incidentId(),
-                    assignment.unitId(),
-                    assignment.route(),
-                    dispatchDecision.rationale()
-            ));
-
-            ResponseUnit unit = findUnit(workingSnapshot, assignment.unitId());
-            if (unit != null) {
-                ResponseUnit updatedUnit = unit.withStatusAndAssignment(
-                        UnitStatus.EN_ROUTE,
-                        Optional.of(assignment.incidentId())
-                );
-                workingSnapshot = workingSnapshot
-                        .withUpdatedUnit(updatedUnit)
-                        .withAddedAssignment(assignment);
-            } else {
-                workingSnapshot = workingSnapshot.withAddedAssignment(assignment);
+                ResponseUnit unit = findUnit(workingSnapshot, assignment.unitId());
+                if (unit != null) {
+                    ResponseUnit updatedUnit = unit.withStatusAndAssignment(
+                            UnitStatus.EN_ROUTE,
+                            Optional.of(assignment.incidentId())
+                    );
+                    workingSnapshot = workingSnapshot
+                            .withUpdatedUnit(updatedUnit)
+                            .withAddedAssignment(assignment);
+                } else {
+                    workingSnapshot = workingSnapshot.withAddedAssignment(assignment);
+                }
             }
         }
         return List.copyOf(commands);

@@ -47,7 +47,9 @@ public final class UnitManager {
                 status,
                 unit.currentNodeId(),
                 unit.assignedIncidentId(),
-                unit.homeDispatchCentreId()
+                unit.homeDispatchCentreId(),
+                unit.capacity(),
+                unit.specializationLevel()
         ));
     }
 
@@ -59,7 +61,9 @@ public final class UnitManager {
                 unit.status(),
                 newNodeId,
                 unit.assignedIncidentId(),
-                unit.homeDispatchCentreId()
+                unit.homeDispatchCentreId(),
+                unit.capacity(),
+                unit.specializationLevel()
         ));
     }
 
@@ -72,7 +76,9 @@ public final class UnitManager {
                 UnitStatus.EN_ROUTE,
                 unit.currentNodeId(),
                 Optional.of(incidentId),
-                unit.homeDispatchCentreId()
+                unit.homeDispatchCentreId(),
+                unit.capacity(),
+                unit.specializationLevel()
         ));
     }
 
@@ -91,7 +97,9 @@ public final class UnitManager {
                 newStatus,
                 unit.currentNodeId(),
                 Optional.empty(),
-                unit.homeDispatchCentreId()
+                unit.homeDispatchCentreId(),
+                unit.capacity(),
+                unit.specializationLevel()
         ));
     }
 
@@ -116,7 +124,9 @@ public final class UnitManager {
                 UnitStatus.REPOSITIONING,
                 unit.currentNodeId(),
                 Optional.empty(),
-                unit.homeDispatchCentreId()
+                unit.homeDispatchCentreId(),
+                unit.capacity(),
+                unit.specializationLevel()
         ));
         pendingRepositionings.put(id, new PendingRepositioning(id, targetNodeId, arrivalAt, reason));
     }
@@ -147,7 +157,9 @@ public final class UnitManager {
                     UnitStatus.AVAILABLE,
                     repositioning.targetNodeId(),
                     Optional.empty(),
-                    unit.homeDispatchCentreId()
+                    unit.homeDispatchCentreId(),
+                    unit.capacity(),
+                    unit.specializationLevel()
             ));
         }
     }

@@ -3,6 +3,7 @@ package com.neca.perds.dispatch;
 import com.neca.perds.model.Assignment;
 import com.neca.perds.model.Incident;
 import com.neca.perds.model.IncidentId;
+import com.neca.perds.model.IncidentSeverity;
 import com.neca.perds.model.IncidentStatus;
 import com.neca.perds.model.NodeId;
 import com.neca.perds.model.ResponseUnit;
@@ -97,6 +98,10 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
             if (excludedUnitIds.contains(unit.id())) {
                 continue;
             }
+            // Check capacity and specialization requirements
+            if (!unit.meetsRequirements(incident.requiredCapacity(), incident.requiredSpecializationLevel())) {
+                continue;
+            }
             eligibleUnitsByNodeId
                     .computeIfAbsent(unit.currentNodeId(), ignored -> new ArrayList<>())
                     .add(unit);
@@ -117,7 +122,7 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
         Route route = VirtualSourceGraphView.stripVirtualSource(virtualRoute.get(), virtualSourceId);
         NodeId startNodeId = route.nodes().getFirst();
 
-        ResponseUnit chosenUnit = chooseUnitAtStartNode(eligibleUnitsByNodeId.get(startNodeId));
+        ResponseUnit chosenUnit = chooseUnitAtStartNode(eligibleUnitsByNodeId.get(startNodeId), incident);
         return Optional.of(createDecision(incident, chosenUnit, route, snapshot));
     }
 
@@ -138,12 +143,27 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
         return new DispatchDecision(assignment, rationale);
     }
 
-    private static ResponseUnit chooseUnitAtStartNode(List<ResponseUnit> candidates) {
+    /**
+     * Chooses the best unit at the start node. For severe incidents, prefers higher specialization.
+     */
+    private static ResponseUnit chooseUnitAtStartNode(List<ResponseUnit> candidates, Incident incident) {
         if (candidates == null || candidates.isEmpty()) {
             throw new IllegalStateException("Expected at least one eligible unit at route start node");
         }
+        
+        Comparator<ResponseUnit> comparator;
+        if (incident.severity().level() >= IncidentSeverity.HIGH.level()) {
+            // For severe incidents, prefer higher specialization, then lower ID
+            comparator = Comparator
+                    .comparing((ResponseUnit u) -> -u.specializationLevel())
+                    .thenComparing(u -> u.id().value());
+        } else {
+            // For non-severe incidents, just use ID for deterministic selection
+            comparator = Comparator.comparing(u -> u.id().value());
+        }
+        
         return candidates.stream()
-                .min(Comparator.comparing((ResponseUnit u) -> u.id().value()))
+                .min(comparator)
                 .orElseThrow();
     }
 

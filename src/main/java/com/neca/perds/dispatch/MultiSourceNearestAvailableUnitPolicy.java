@@ -122,7 +122,8 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
         Route route = VirtualSourceGraphView.stripVirtualSource(virtualRoute.get(), virtualSourceId);
         NodeId startNodeId = route.nodes().getFirst();
 
-        ResponseUnit chosenUnit = chooseUnitAtStartNode(eligibleUnitsByNodeId.get(startNodeId), incident);
+        ResponseUnit chosenUnit = chooseUnitAtStartNode(
+                eligibleUnitsByNodeId.get(startNodeId), incident, snapshot, router, costFunction);
         return Optional.of(createDecision(incident, chosenUnit, route, snapshot));
     }
 
@@ -145,21 +146,33 @@ public final class MultiSourceNearestAvailableUnitPolicy implements DispatchPoli
 
     /**
      * Chooses the best unit at the start node. For severe incidents, prefers higher specialization.
+     * Also considers dispatch centre preference as a tiebreaker.
      */
-    private static ResponseUnit chooseUnitAtStartNode(List<ResponseUnit> candidates, Incident incident) {
+    private static ResponseUnit chooseUnitAtStartNode(
+            List<ResponseUnit> candidates,
+            Incident incident,
+            SystemSnapshot snapshot,
+            Router router,
+            EdgeCostFunction costFunction
+    ) {
         if (candidates == null || candidates.isEmpty()) {
             throw new IllegalStateException("Expected at least one eligible unit at route start node");
         }
         
         Comparator<ResponseUnit> comparator;
         if (incident.severity().level() >= IncidentSeverity.HIGH.level()) {
-            // For severe incidents, prefer higher specialization, then lower ID
+            // For severe incidents, prefer higher specialization, then dispatch centre preference, then ID
             comparator = Comparator
                     .comparing((ResponseUnit u) -> -u.specializationLevel())
+                    .thenComparing(u -> DispatchCentrePreference.computePreferenceScore(
+                            snapshot, u, incident.locationNodeId(), router, costFunction))
                     .thenComparing(u -> u.id().value());
         } else {
-            // For non-severe incidents, just use ID for deterministic selection
-            comparator = Comparator.comparing(u -> u.id().value());
+            // For non-severe incidents, dispatch centre preference, then ID
+            comparator = Comparator
+                    .comparing((ResponseUnit u) -> DispatchCentrePreference.computePreferenceScore(
+                            snapshot, u, incident.locationNodeId(), router, costFunction))
+                    .thenComparing(u -> u.id().value());
         }
         
         return candidates.stream()

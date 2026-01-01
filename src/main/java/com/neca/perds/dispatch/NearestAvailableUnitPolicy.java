@@ -93,7 +93,9 @@ public final class NearestAvailableUnitPolicy implements DispatchPolicy {
                     continue;
                 }
 
-                Candidate candidate = new Candidate(unit, route.get());
+                double dcScore = DispatchCentrePreference.computePreferenceScore(
+                        snapshot, unit, incident.locationNodeId(), router, costFunction);
+                Candidate candidate = new Candidate(unit, route.get(), dcScore);
                 if (best == null || candidate.isBetterThan(best, incident)) {
                     best = candidate;
                 }
@@ -148,12 +150,14 @@ public final class NearestAvailableUnitPolicy implements DispatchPolicy {
         return assignedTypes;
     }
 
-    private record Candidate(ResponseUnit unit, Route route) {
+    private record Candidate(ResponseUnit unit, Route route, double dispatchCentreScore) {
         /**
          * Compares candidates considering travel cost, specialization preference for severe incidents,
-         * distance, and unit ID as tiebreaker.
+         * distance, dispatch centre preference, and unit ID as tiebreaker.
          * 
          * For HIGH/CRITICAL incidents, prefers higher specialization when costs are similar.
+         * Dispatch centre preference: prefers units that are not at home base (maintains coverage)
+         * and will be closer to home after the incident.
          */
         private boolean isBetterThan(Candidate other, Incident incident) {
             int costComparison = Double.compare(route.totalCost(), other.route.totalCost());
@@ -173,6 +177,13 @@ public final class NearestAvailableUnitPolicy implements DispatchPolicy {
             if (distanceComparison != 0) {
                 return distanceComparison < 0;
             }
+            
+            // Prefer units with lower dispatch centre score (not at home, closer return)
+            int dcScoreComparison = Double.compare(dispatchCentreScore, other.dispatchCentreScore);
+            if (dcScoreComparison != 0) {
+                return dcScoreComparison < 0;
+            }
+            
             UnitId thisId = unit.id();
             UnitId otherId = other.unit.id();
             return thisId.value().compareTo(otherId.value()) < 0;

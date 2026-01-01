@@ -121,6 +121,8 @@ public final class PerdsController implements SystemCommandExecutor {
             case SystemCommand.SetUnitStatusCommand c -> setUnitStatus(c.unitId(), c.status());
             case SystemCommand.MoveUnitCommand c -> unitManager.move(c.unitId(), c.newNodeId());
             case SystemCommand.PrepositionUnitsCommand c -> prepositionUnits(c.horizon(), at);
+            case SystemCommand.RegisterDispatchCentreCommand c -> 
+                    dispatchCentres.put(c.dispatchCentre().id(), c.dispatchCentre());
         }
 
         if (changedEdgeMayInvalidateRoutes) {
@@ -207,7 +209,47 @@ public final class PerdsController implements SystemCommandExecutor {
             return;
         }
 
-        unitManager.clearAssignment(assignment.unitId());
+        UnitId unitId = assignment.unitId();
+        unitManager.clearAssignment(unitId);
+        
+        // Trigger return-to-base for the unit
+        triggerReturnToBase(unitId, at);
+    }
+
+    /**
+     * Initiates return-to-base for a unit if it has a home dispatch centre
+     * and is not already at that location.
+     */
+    private void triggerReturnToBase(UnitId unitId, Instant at) {
+        ResponseUnit unit = unitManager.get(unitId).orElse(null);
+        if (unit == null || !unit.isAvailable()) {
+            return;
+        }
+        if (unit.homeDispatchCentreId().isEmpty()) {
+            return;
+        }
+
+        DispatchCentre homeCentre = dispatchCentres.get(unit.homeDispatchCentreId().get());
+        if (homeCentre == null) {
+            return;
+        }
+
+        NodeId homeNodeId = homeCentre.nodeId();
+        if (unit.currentNodeId().equals(homeNodeId)) {
+            return; // Already at home
+        }
+
+        // Compute route home
+        Optional<Route> routeHome = REROUTE_ROUTER.findRoute(
+                graph, unit.currentNodeId(), homeNodeId, REROUTE_COST_FUNCTION);
+        if (routeHome.isEmpty()) {
+            return;
+        }
+
+        // Start repositioning to home base
+        Instant arrivalAt = at.plus(routeHome.get().totalTravelTime());
+        unitManager.startRepositioning(unitId, homeNodeId, arrivalAt,
+                "Returning to home dispatch centre: " + homeCentre.id());
     }
 
     private void setUnitStatus(UnitId unitId, UnitStatus status) {

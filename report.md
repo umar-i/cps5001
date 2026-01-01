@@ -203,17 +203,37 @@ All constants include Javadoc documentation explaining their purpose.
 
 ### 4.1 FUNCTIONALITY ENHANCEMENTS
 
-#### Enhancement #1: Multi-Unit Incident Support
+#### Enhancement #1: Multi-Unit Incident Support ✅ IMPLEMENTED
 **Current:** Incidents can specify `requiredUnitTypes` as a Set, but only one unit is dispatched.  
-**Enhancement:** Support dispatching multiple units for complex incidents.
+**Enhancement:** Support dispatching multiple units for complex incidents.  
+**Implementation:**
+- `DispatchPolicy.chooseAll()` method returns dispatch decisions for all required unit types
+- `DefaultDispatchEngine` processes multi-unit decisions and updates working snapshot
+- Existing `choose()` method maintained for backward compatibility
+**Status:** ✅ Implemented with full test coverage (7 tests in `MultiUnitDispatchTest`)
 
-#### Enhancement #2: Unit Capacity and Specialization
+#### Enhancement #2: Unit Capacity and Specialization ✅ IMPLEMENTED
 **Current:** All units are treated equally within a type.  
-**Enhancement:** Add capacity and specialization levels.
+**Enhancement:** Add capacity and specialization levels.  
+**Status:** ✅ Implemented with full test coverage (9 tests)
 
-#### Enhancement #3: Time-of-Day Congestion Modeling
+#### Enhancement #3: Time-of-Day Congestion Modeling ✅ IMPLEMENTED
 **Current:** Edge weights are static until explicitly updated.  
-**Enhancement:** Add time-based weight multipliers for rush hour simulation.
+**Enhancement:** Add time-based weight multipliers for rush hour simulation.  
+**Implementation:**
+- `CongestionProfile` - Defines time periods with multipliers (e.g., morning rush 07:00-09:00: 1.5x, evening rush 17:00-19:00: 1.7x)
+- `TimeAwareCostFunction` - Wraps any EdgeCostFunction and applies time-based multipliers from simulation clock
+- `CostFunctions.travelTimeWithCongestion()` - Factory method for easy creation
+- Supports overnight periods, multiple time zones, and custom profiles
+- Backward compatible - existing code continues to work unchanged
+
+**Usage Example:**
+```java
+CongestionProfile profile = CongestionProfile.standardRushHour();
+EdgeCostFunction costFn = CostFunctions.travelTimeWithCongestion(profile, clock::now);
+// Route costs now vary: 1.5x during morning rush, 1.7x during evening rush
+```
+**Status:** ✅ Implemented with full test coverage (26 tests)
 
 #### Enhancement #4: Dispatch Centre Association
 **Current:** `DispatchCentre` model exists but is not actively used.  
@@ -337,10 +357,13 @@ All constants include Javadoc documentation explaining their purpose.
 9. ~~Add inline documentation for complex algorithms~~ ✅ Fixed
 10. ~~Extract magic numbers to named constants~~ ✅ Fixed
 11. ~~Standardize collection return types~~ ✅ Fixed
+12. ~~Multi-unit incident dispatch support~~ ✅ Implemented (Enhancement #1)
+13. ~~Unit capacity and specialization~~ ✅ Implemented (Enhancement #2)
+14. ~~Time-of-day congestion modeling~~ ✅ Implemented (Enhancement #3)
 
 ### Remaining (Nice to Have)
-1. Multi-unit incident dispatch support
-2. Configuration file support
+1. Configuration file support
+2. Dispatch centre return-to-base behavior
 
 ---
 
@@ -355,22 +378,27 @@ The PERDS implementation is a **comprehensive, well-architected solution** that 
 The codebase successfully meets all requirements for the **First Class (80-100) grade band** and exhibits:
 - Clean separation of concerns
 - Extensible design patterns
-- Comprehensive test coverage (41 tests, all passing)
+- Comprehensive test coverage (83 tests, all passing)
 - Working evaluation framework
 - Realistic simulation behavior (including travel-time-based repositioning)
+- Advanced features: multi-unit dispatch, capacity/specialization filtering, time-of-day congestion modeling
 
-**All identified bugs have been fixed without introducing regressions.** All high, medium, and low priority code smells have been refactored. The code is ready for submission.
+**All identified bugs have been fixed without introducing regressions.** All high, medium, and low priority code smells have been refactored. Three major enhancements have been implemented. The code is ready for submission.
 
 ---
 
 ## 10. Test Results
 
 ```
-Tests run: 41, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 83, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
-All tests pass after bug fixes, confirming no regressions were introduced.
+All tests pass after bug fixes and enhancements, confirming no regressions were introduced.
+
+**New tests added:**
+- `CongestionProfileTest` (12 tests) - Time period definitions and multiplier logic
+- `TimeAwareCostFunctionTest` (14 tests) - Time-aware routing cost integration
 
 ---
 

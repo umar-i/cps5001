@@ -3,6 +3,7 @@ package com.neca.perds.sim;
 import com.neca.perds.graph.Edge;
 import com.neca.perds.graph.EdgeStatus;
 import com.neca.perds.graph.EdgeWeights;
+import com.neca.perds.model.DispatchCentre;
 import com.neca.perds.model.Incident;
 import com.neca.perds.model.IncidentId;
 import com.neca.perds.model.Node;
@@ -25,7 +26,8 @@ public sealed interface SystemCommand permits
         SystemCommand.RegisterUnitCommand,
         SystemCommand.SetUnitStatusCommand,
         SystemCommand.MoveUnitCommand,
-        SystemCommand.PrepositionUnitsCommand {
+        SystemCommand.PrepositionUnitsCommand,
+        SystemCommand.RegisterDispatchCentreCommand {
 
     record ReportIncidentCommand(Incident incident) implements SystemCommand {
         public ReportIncidentCommand {
@@ -99,6 +101,12 @@ public sealed interface SystemCommand permits
             if (horizon.isNegative() || horizon.isZero()) {
                 throw new IllegalArgumentException("horizon must be > 0");
             }
+        }
+    }
+
+    record RegisterDispatchCentreCommand(DispatchCentre dispatchCentre) implements SystemCommand {
+        public RegisterDispatchCentreCommand {
+            Objects.requireNonNull(dispatchCentre, "dispatchCentre");
         }
     }
 }

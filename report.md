@@ -235,9 +235,36 @@ EdgeCostFunction costFn = CostFunctions.travelTimeWithCongestion(profile, clock:
 ```
 **Status:** ✅ Implemented with full test coverage (26 tests)
 
-#### Enhancement #4: Dispatch Centre Association
+#### Enhancement #4: Dispatch Centre Association ✅ IMPLEMENTED
 **Current:** `DispatchCentre` model exists but is not actively used.  
-**Enhancement:** Implement return-to-base behavior and dispatch centre preferences.
+**Enhancement:** Implement return-to-base behavior and dispatch centre preferences.  
+**Implementation:**
+- **Return-to-Base Behavior**: Units automatically return to their home dispatch centre after completing an incident
+  - `triggerReturnToBase()` in PerdsController initiates repositioning after incident resolution
+  - Uses existing REPOSITIONING status with travel time calculation
+  - Can be interrupted by new incidents (REPOSITIONING units remain available)
+- **Dispatch Centre Preferences**: When selecting units for dispatch, the system now considers:
+  - Units NOT at home base are preferred (to maintain coverage at dispatch centres)
+  - Distance from incident back to home base (lower is better)
+  - `DispatchCentrePreference` utility class computes preference scores
+  - Integrated into both `NearestAvailableUnitPolicy` and `MultiSourceNearestAvailableUnitPolicy`
+- **New Command**: `RegisterDispatchCentreCommand` for registering dispatch centres
+- **New Classes**: `ReturnToBasePolicy`, `DispatchCentrePreference`
+
+**Usage Example:**
+```java
+// Register dispatch centre
+controller.execute(new SystemCommand.RegisterDispatchCentreCommand(
+    new DispatchCentre(new DispatchCentreId("DC1"), nodeA, Set.of())), now);
+
+// Register unit with home base
+controller.execute(new SystemCommand.RegisterUnitCommand(new ResponseUnit(
+    unitId, UnitType.AMBULANCE, UnitStatus.AVAILABLE, nodeA,
+    Optional.empty(), Optional.of(new DispatchCentreId("DC1")))), now);
+
+// After incident resolution, unit automatically returns to nodeA
+```
+**Status:** ✅ Implemented with full test coverage (20 tests)
 
 ### 4.2 NON-FUNCTIONAL ENHANCEMENTS
 
@@ -360,6 +387,7 @@ EdgeCostFunction costFn = CostFunctions.travelTimeWithCongestion(profile, clock:
 12. ~~Multi-unit incident dispatch support~~ ✅ Implemented (Enhancement #1)
 13. ~~Unit capacity and specialization~~ ✅ Implemented (Enhancement #2)
 14. ~~Time-of-day congestion modeling~~ ✅ Implemented (Enhancement #3)
+15. ~~Dispatch centre association~~ ✅ Implemented (Enhancement #4)
 
 ### Remaining (Nice to Have)
 1. Configuration file support
@@ -378,27 +406,30 @@ The PERDS implementation is a **comprehensive, well-architected solution** that 
 The codebase successfully meets all requirements for the **First Class (80-100) grade band** and exhibits:
 - Clean separation of concerns
 - Extensible design patterns
-- Comprehensive test coverage (83 tests, all passing)
+- Comprehensive test coverage (103 tests, all passing)
 - Working evaluation framework
 - Realistic simulation behavior (including travel-time-based repositioning)
-- Advanced features: multi-unit dispatch, capacity/specialization filtering, time-of-day congestion modeling
+- Advanced features: multi-unit dispatch, capacity/specialization filtering, time-of-day congestion modeling, dispatch centre association
 
-**All identified bugs have been fixed without introducing regressions.** All high, medium, and low priority code smells have been refactored. Three major enhancements have been implemented. The code is ready for submission.
+**All identified bugs have been fixed without introducing regressions.** All high, medium, and low priority code smells have been refactored. Four major enhancements have been implemented. The code is ready for submission.
 
 ---
 
 ## 10. Test Results
 
 ```
-Tests run: 83, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 103, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
 All tests pass after bug fixes and enhancements, confirming no regressions were introduced.
 
-**New tests added:**
+**New tests added for Enhancement #3 and #4:**
 - `CongestionProfileTest` (12 tests) - Time period definitions and multiplier logic
 - `TimeAwareCostFunctionTest` (14 tests) - Time-aware routing cost integration
+- `ReturnToBasePolicyTest` (8 tests) - Return-to-base policy decisions
+- `DispatchCentrePreferenceTest` (7 tests) - Dispatch centre preference scoring
+- `PerdsControllerDispatchCentreTest` (5 tests) - End-to-end dispatch centre integration
 
 ---
 

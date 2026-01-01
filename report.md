@@ -391,6 +391,7 @@ controller.execute(new SystemCommand.RegisterUnitCommand(new ResponseUnit(
 
 ### Remaining (Nice to Have)
 1. Configuration file support
+2. Dispatch centre return-to-base behavior
 
 ---
 

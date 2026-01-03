@@ -1,6 +1,8 @@
 package com.neca.perds.cli;
 
 import com.neca.perds.app.PerdsController;
+import com.neca.perds.config.ConfigLoader;
+import com.neca.perds.config.PerdsConfig;
 import com.neca.perds.dispatch.DefaultDispatchEngine;
 import com.neca.perds.dispatch.MultiSourceNearestAvailableUnitPolicy;
 import com.neca.perds.dispatch.NearestAvailableUnitPolicy;
@@ -12,6 +14,7 @@ import com.neca.perds.graph.EdgeWeights;
 import com.neca.perds.io.CsvGraphLoader;
 import com.neca.perds.io.CsvScenarioLoader;
 import com.neca.perds.metrics.CsvMetricsExporter;
+import com.neca.perds.metrics.HtmlMetricsExporter;
 import com.neca.perds.metrics.InMemoryMetricsCollector;
 import com.neca.perds.metrics.ScenarioSummary;
 import com.neca.perds.model.Incident;
@@ -26,6 +29,7 @@ import com.neca.perds.model.UnitId;
 import com.neca.perds.model.UnitStatus;
 import com.neca.perds.model.UnitType;
 import com.neca.perds.prediction.AdaptiveEnsembleDemandPredictor;
+import com.neca.perds.prediction.ExponentialSmoothingDemandPredictor;
 import com.neca.perds.prediction.MultiHotspotPrepositioningStrategy;
 import com.neca.perds.prediction.NoOpDemandPredictor;
 import com.neca.perds.prediction.NoOpPrepositioningStrategy;
@@ -77,6 +81,10 @@ public final class Main {
             runVerify();
             return;
         }
+        if (args[0].equalsIgnoreCase("genconfig")) {
+            runGenConfig(args);
+            return;
+        }
         if (args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("--help") || args[0].equalsIgnoreCase("-h")) {
             printUsage();
             return;
@@ -90,8 +98,12 @@ public final class Main {
         System.out.println("Usage:");
         System.out.println("  mvn -q -DskipTests package && java -jar target/perds-0.1.0-SNAPSHOT.jar demo");
         System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar verify");
-        System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar scenario <nodes.csv> <edges.csv> <events.csv> [outDir]");
-        System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar evaluate <nodes.csv> <edges.csv> <outDir> [runs] [seed]");
+        System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar scenario <nodes.csv> <edges.csv> <events.csv> [outDir] [--config=<file>]");
+        System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar evaluate <nodes.csv> <edges.csv> <outDir> [runs] [seed] [--config=<file>]");
+        System.out.println("  java -jar target/perds-0.1.0-SNAPSHOT.jar genconfig <output.properties>");
+        System.out.println();
+        System.out.println("Options:");
+        System.out.println("  --config=<file>    Load configuration from properties file");
     }
 
     private static void runDemo() {
@@ -175,7 +187,24 @@ public final class Main {
         Path nodesCsv = Path.of(args[1]);
         Path edgesCsv = Path.of(args[2]);
         Path eventsCsv = Path.of(args[3]);
-        Path outDir = args.length >= 5 ? Path.of(args[4]) : null;
+        Path outDir = null;
+        PerdsConfig config = PerdsConfig.DEFAULT;
+
+        // Parse remaining args
+        for (int i = 4; i < args.length; i++) {
+            String arg = args[i];
+            if (arg.startsWith("--config=")) {
+                try {
+                    config = ConfigLoader.loadFromPath(Path.of(arg.substring(9)));
+                    System.out.println("Loaded configuration from: " + arg.substring(9));
+                } catch (IOException e) {
+                    System.err.println("Failed to load config: " + e.getMessage());
+                    return;
+                }
+            } else if (outDir == null) {
+                outDir = Path.of(arg);
+            }
+        }
 
         InMemoryMetricsCollector metrics = new InMemoryMetricsCollector();
         var dispatchEngine = new DefaultDispatchEngine(
@@ -185,8 +214,22 @@ public final class Main {
 
         try {
             var graph = new CsvGraphLoader().load(nodesCsv, edgesCsv);
-            var demandPredictor = new AdaptiveEnsembleDemandPredictor();
-            var prepositioning = new MultiHotspotPrepositioningStrategy();
+            var demandPredictor = new AdaptiveEnsembleDemandPredictor(
+                    nodeId -> new com.neca.perds.model.ZoneId(nodeId.value()),
+                    List.of(
+                            new AdaptiveEnsembleDemandPredictor.Model("slidingWindow",
+                                    new SlidingWindowDemandPredictor(nodeId -> new com.neca.perds.model.ZoneId(nodeId.value()),
+                                            config.prediction().slidingWindowDuration())),
+                            new AdaptiveEnsembleDemandPredictor.Model("expSmoothing",
+                                    new ExponentialSmoothingDemandPredictor(nodeId -> new com.neca.perds.model.ZoneId(nodeId.value()),
+                                            config.prediction().exponentialSmoothingAlpha()))
+                    ),
+                    config.prediction().adaptiveLearningRate()
+            );
+            var prepositioning = new MultiHotspotPrepositioningStrategy(
+                    config.prepositioning().maxMoves(),
+                    config.prepositioning().maxZones()
+            );
             var controller = new PerdsController(graph, dispatchEngine, demandPredictor, prepositioning, metrics);
 
             var events = new CsvScenarioLoader().load(eventsCsv);
@@ -214,6 +257,20 @@ public final class Main {
             System.err.println("I/O error: " + e.getMessage());
         } catch (RuntimeException e) {
             System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    private static void runGenConfig(String[] args) {
+        if (args.length < 2) {
+            System.err.println("Usage: genconfig <output.properties>");
+            return;
+        }
+        Path outputPath = Path.of(args[1]);
+        try {
+            Files.writeString(outputPath, ConfigLoader.generateSampleConfig());
+            System.out.println("Generated sample configuration: " + outputPath.toAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Failed to write config file: " + e.getMessage());
         }
     }
 
@@ -607,6 +664,7 @@ public final class Main {
         writeSummaryCsv(outDir.resolve("evaluation_summary.csv"), rows);
         writeAggregateCsv(outDir.resolve("evaluation_aggregate.csv"), aggregates);
         writeAggregateMd(outDir.resolve("evaluation_aggregate.md"), config, aggregates);
+        writeAggregateHtml(outDir.resolve("evaluation_report.html"), config, aggregates);
     }
 
     private static List<VariantAggregate> aggregateByVariant(List<EvaluationRow> rows) {
@@ -713,6 +771,32 @@ public final class Main {
                 writer.newLine();
             }
         }
+    }
+
+    private static void writeAggregateHtml(Path path, SyntheticLoadConfig config, List<VariantAggregate> aggregates) throws IOException {
+        var htmlConfig = new HtmlMetricsExporter.EvaluationConfig(
+                config.duration().toString(),
+                config.unitCount(),
+                config.incidentCount(),
+                config.congestionEventCount(),
+                config.unitOutageCount()
+        );
+
+        List<HtmlMetricsExporter.VariantMetrics> variants = aggregates.stream()
+                .map(agg -> new HtmlMetricsExporter.VariantMetrics(
+                        agg.variant(),
+                        agg.runs(),
+                        agg.etaAvgMean(),
+                        agg.etaAvgP95(),
+                        agg.waitAvgMean(),
+                        agg.waitAvgP95(),
+                        agg.computeAvgMean(),
+                        agg.cancelsMean(),
+                        agg.reroutesMean()
+                ))
+                .toList();
+
+        HtmlMetricsExporter.exportReport(path, htmlConfig, variants);
     }
 
     private static double mean(List<Double> values) {

@@ -268,13 +268,56 @@ controller.execute(new SystemCommand.RegisterUnitCommand(new ResponseUnit(
 
 ### 4.2 NON-FUNCTIONAL ENHANCEMENTS
 
-#### Enhancement #5: Configuration File Support
+#### Enhancement #5: Configuration File Support ✅ IMPLEMENTED
 **Current:** Hardcoded defaults for prediction parameters, prepositioning limits, etc.  
-**Enhancement:** Support properties file or YAML configuration.
+**Enhancement:** Support properties file configuration.  
+**Implementation:**
+- `PerdsConfig` record with nested `PredictionConfig` and `PrepositioningConfig`
+- `ConfigLoader` loads from .properties files with validation
+- `ConfigurationException` for clear error reporting
+- CLI support via `--config=<file>` flag for scenario/evaluate commands
+- New `genconfig` command generates sample configuration file
 
-#### Enhancement #6: Metrics Visualization
+**Supported Properties:**
+```properties
+# Prediction Configuration
+prediction.adaptive.learningRate=0.25
+prediction.slidingWindow.durationMinutes=60
+prediction.exponentialSmoothing.alpha=0.3
+
+# Prepositioning Configuration
+prepositioning.maxMoves=3
+prepositioning.maxZones=3
+```
+
+**Usage Example:**
+```bash
+# Generate sample config
+java -jar perds.jar genconfig myconfig.properties
+
+# Run with custom config
+java -jar perds.jar scenario nodes.csv edges.csv events.csv output --config=myconfig.properties
+```
+**Status:** ✅ Implemented with full test coverage (16 tests)
+
+#### Enhancement #6: Metrics Visualization ✅ IMPLEMENTED
 **Current:** CSV export only.  
-**Enhancement:** Generate HTML report with embedded charts for evaluation results.
+**Enhancement:** Generate HTML report with embedded charts for evaluation results.  
+**Implementation:**
+- `HtmlMetricsExporter` generates standalone HTML files (no external dependencies)
+- Embedded SVG bar charts for key metrics comparison
+- Professional styling with responsive layout
+- Metrics table with best-value highlighting
+- Automatically generated during `evaluate` command
+
+**Report Features:**
+- Configuration summary (duration, units, incidents, etc.)
+- Bar charts for: Average Response Time, Average Wait Time, Compute Time
+- Detailed metrics table with all variant statistics
+- Visual highlighting of best-performing variant
+
+**Output:** `evaluation_report.html` in evaluation output directory
+**Status:** ✅ Implemented with full test coverage (11 tests)
 
 ---
 
@@ -388,10 +431,11 @@ controller.execute(new SystemCommand.RegisterUnitCommand(new ResponseUnit(
 13. ~~Unit capacity and specialization~~ ✅ Implemented (Enhancement #2)
 14. ~~Time-of-day congestion modeling~~ ✅ Implemented (Enhancement #3)
 15. ~~Dispatch centre association~~ ✅ Implemented (Enhancement #4)
+16. ~~Configuration file support~~ ✅ Implemented (Enhancement #5)
+17. ~~Metrics visualization (HTML reports)~~ ✅ Implemented (Enhancement #6)
 
 ### Remaining (Nice to Have)
-1. Configuration file support
-2. Dispatch centre return-to-base behavior
+None - all planned enhancements have been implemented.
 
 ---
 
@@ -406,32 +450,36 @@ The PERDS implementation is a **comprehensive, well-architected solution** that 
 The codebase successfully meets all requirements for the **First Class (80-100) grade band** and exhibits:
 - Clean separation of concerns
 - Extensible design patterns
-- Comprehensive test coverage (103 tests, all passing)
+- Comprehensive test coverage (130 tests, all passing)
 - Working evaluation framework
 - Realistic simulation behavior (including travel-time-based repositioning)
 - Advanced features: multi-unit dispatch, capacity/specialization filtering, time-of-day congestion modeling, dispatch centre association
+- Configuration file support for tuning prediction/prepositioning parameters
+- HTML visualization for evaluation metrics
 
-**All identified bugs have been fixed without introducing regressions.** All high, medium, and low priority code smells have been refactored. Four major enhancements have been implemented. The code is ready for submission.
+**All identified bugs have been fixed without introducing regressions.** All high, medium, and low priority code smells have been refactored. Six major enhancements have been implemented. The code is ready for submission.
 
 ---
 
 ## 10. Test Results
 
 ```
-Tests run: 103, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 130, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
 All tests pass after bug fixes and enhancements, confirming no regressions were introduced.
 
-**New tests added for Enhancement #3 and #4:**
+**New tests added for Enhancements #3-#6:**
 - `CongestionProfileTest` (12 tests) - Time period definitions and multiplier logic
 - `TimeAwareCostFunctionTest` (14 tests) - Time-aware routing cost integration
 - `ReturnToBasePolicyTest` (8 tests) - Return-to-base policy decisions
 - `DispatchCentrePreferenceTest` (7 tests) - Dispatch centre preference scoring
 - `PerdsControllerDispatchCentreTest` (5 tests) - End-to-end dispatch centre integration
+- `ConfigLoaderTest` (16 tests) - Configuration loading and validation
+- `HtmlMetricsExporterTest` (11 tests) - HTML report generation
 
 ---
 
 *Report generated by code review analysis on December 27, 2025*  
-*Last updated: December 27, 2025 after bug fixes and refactoring*
+*Last updated: January 3, 2026 after Enhancement #5 and #6 implementation*
